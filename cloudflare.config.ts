@@ -13,7 +13,7 @@ export default defineConfig({
 		compatibilityDate: "2026-11-19",
 		entrypoint,
 		// Files in public/ are served as they are; every other path runs the
-		// Worker, which renders the pages and handles POST /contact.
+		// Worker, which renders the pages and handles POST /api/contact.
 		assets: {},
 		// Keep the workers.dev address when a route or domain is added, and keep
 		// Workers Logs on: the Worker logs failed reCAPTCHA checks and sends.

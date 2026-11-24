@@ -7,4 +7,6 @@ dist/
 .env*
 !.env.example
 *.log
+# Compiled by `pnpm run css` from src/styles/app.css
+public/style.css
 .DS_Store

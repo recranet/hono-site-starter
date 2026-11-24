@@ -10,3 +10,5 @@ overrides:
 allowBuilds:
   esbuild: true
   workerd: true
+  # Only the Tailwind CLI's --watch uses it; the one-off build doesn't.
+  "@parcel/watcher": false

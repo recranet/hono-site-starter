@@ -2,7 +2,8 @@ import { env } from "cloudflare:workers";
 import { toHTML } from "@portabletext/to-html";
 import { raw } from "hono/html";
 
-// The text blocks the customer can edit, by page. `text` shows until the
+// The site's pages and the text blocks the customer can edit on each. The
+// navbar lists the pages in this order. `text` shows until the
 // customer saves the block; a blank line starts a new paragraph. The admin
 // lists them in this order. Names are part of the stored row: renaming one
 // loses its saved text.
@@ -10,6 +11,28 @@ export const pages = {
 	home: {
 		title: "Home",
 		path: "/",
+		blocks: {
+			intro: {
+				label: "Introductie",
+				text: "Een site op Cloudflare Workers. De teksten zijn te bewerken via /admin/.",
+			},
+			about: {
+				label: "Over deze site",
+				text: "De pagina's worden op de Worker gerenderd. De klant logt in en past de teksten aan.",
+			},
+		},
+	},
+	"over-ons": {
+		title: "Over ons",
+		path: "/over-ons/",
+		blocks: {
+			intro: { label: "Introductie", text: "Dit is een voorbeeldpagina met tekst." },
+			body: { label: "Tekst", text: "Vertel hier wie je bent en wat je doet." },
+		},
+	},
+	contact: {
+		title: "Contact",
+		path: "/contact/",
 		blocks: {
 			intro: { label: "Introductie", text: "Neem contact met ons op." },
 		},

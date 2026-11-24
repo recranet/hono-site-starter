@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 
 // The contact form's POST: checks reCAPTCHA, then mails the message to MAIL_TO
-// with the Email Sending binding. Mounted in index.tsx as POST /contact.
+// with the Email Sending binding. Mounted in index.tsx as POST /api/contact.
 
 const LIMITS = { name: 200, email: 254, message: 5000 };
 
