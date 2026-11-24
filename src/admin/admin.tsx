@@ -31,13 +31,18 @@ import { useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { AdminData } from "./index.tsx";
 
-// What the customer can do: bold, italic, link, heading, list. Public pages
-// render the same with @portabletext/to-html (blocks.ts).
+// What the customer can do: everything @portabletext/to-html renders on the
+// public pages without custom components (blocks.ts).
 const schemaDefinition = defineSchema({
-	decorators: [{ name: "strong" }, { name: "em" }],
-	styles: [{ name: "normal" }, { name: "h2" }],
+	decorators: [
+		{ name: "strong" },
+		{ name: "em" },
+		{ name: "underline" },
+		{ name: "strike-through" },
+	],
+	styles: [{ name: "normal" }, { name: "h2" }, { name: "h3" }, { name: "blockquote" }],
 	annotations: [{ name: "link", fields: [{ name: "href", type: "string" }] }],
-	lists: [{ name: "bullet" }],
+	lists: [{ name: "bullet" }, { name: "number" }],
 	inlineObjects: [],
 	blockObjects: [],
 });
@@ -46,18 +51,22 @@ const nodes = [
 	defineTextBlock({
 		type: "block",
 		render: ({ attributes, children, node }) => {
-			if (node.style === "h2") return <h2 {...attributes}>{children}</h2>;
 			if (node.listItem)
 				return (
-					<div {...attributes} className="pt-bullet">
+					<div {...attributes} className={`pt-${node.listItem}`}>
 						{children}
 					</div>
 				);
+			if (node.style === "h2") return <h2 {...attributes}>{children}</h2>;
+			if (node.style === "h3") return <h3 {...attributes}>{children}</h3>;
+			if (node.style === "blockquote") return <blockquote {...attributes}>{children}</blockquote>;
 			return <p {...attributes}>{children}</p>;
 		},
 	}),
 	defineDecorator({ type: "strong", render: ({ children }) => <strong>{children}</strong> }),
 	defineDecorator({ type: "em", render: ({ children }) => <em>{children}</em> }),
+	defineDecorator({ type: "underline", render: ({ children }) => <u>{children}</u> }),
+	defineDecorator({ type: "strike-through", render: ({ children }) => <s>{children}</s> }),
 	defineAnnotation({
 		type: "link",
 		render: ({ children, annotation }) => (
@@ -111,36 +120,80 @@ function TextSelect() {
 	);
 }
 
+// A click on a format button leaves the focus and selection in the editor.
+const keepFocus = (event: { preventDefault: () => void }) => event.preventDefault();
+
 function FormatToolbar() {
 	const editor = useEditor();
 	const style = useEditorSelector(editor, getActiveStyle);
 	const list = useEditorSelector(editor, getActiveListItem);
 	const bold = useEditorSelector(editor, isActiveDecorator("strong"));
 	const italic = useEditorSelector(editor, isActiveDecorator("em"));
+	const underline = useEditorSelector(editor, isActiveDecorator("underline"));
+	const strike = useEditorSelector(editor, isActiveDecorator("strike-through"));
 
 	const send = (event: Parameters<typeof editor.send>[0]) => {
 		editor.send(event);
 		editor.send({ type: "focus" });
 	};
-	const toggle = (label: string, pressed: boolean, onClick: () => void) => (
+	const toggle = (label: string, title: string, pressed: boolean, onClick: () => void) => (
 		<Toolbar.Button
 			className="tool"
+			aria-label={title}
+			title={title}
+			onMouseDown={keepFocus}
 			render={<Toggle pressed={pressed} onPressedChange={onClick} />}
 		>
 			{label}
 		</Toolbar.Button>
 	);
+	const button = (label: string, title: string, onClick: () => void) => (
+		<Toolbar.Button
+			className="tool"
+			aria-label={title}
+			title={title}
+			onMouseDown={keepFocus}
+			onClick={onClick}
+		>
+			{label}
+		</Toolbar.Button>
+	);
+	const decorator = (name: string) => () => send({ type: "decorator.toggle", decorator: name });
+	const blockStyle = (name: string) => () => send({ type: "style.toggle", style: name });
+	const listItem = (name: string) => () => send({ type: "list item.toggle", listItem: name });
 
 	return (
 		<Toolbar.Root className="toolbar" aria-label="Opmaak">
-			{toggle("Vet", bold, () => send({ type: "decorator.toggle", decorator: "strong" }))}
-			{toggle("Cursief", italic, () => send({ type: "decorator.toggle", decorator: "em" }))}
-			{toggle("Kop", style === "h2", () => send({ type: "style.toggle", style: "h2" }))}
-			{toggle("Lijst", list === "bullet", () =>
-				send({ type: "list item.toggle", listItem: "bullet" }),
-			)}
+			<Toolbar.Group className="tool-group" aria-label="Tekst">
+				{toggle("B", "Vet", bold, decorator("strong"))}
+				{toggle("I", "Cursief", italic, decorator("em"))}
+				{toggle("U", "Onderstreept", underline, decorator("underline"))}
+				{toggle("S", "Doorgehaald", strike, decorator("strike-through"))}
+			</Toolbar.Group>
+			<Toolbar.Separator className="separator" />
+			<Toolbar.Group className="tool-group" aria-label="Alinea">
+				{toggle("H2", "Kop", style === "h2", blockStyle("h2"))}
+				{toggle("H3", "Subkop", style === "h3", blockStyle("h3"))}
+				{toggle("❝", "Citaat", style === "blockquote", blockStyle("blockquote"))}
+				{toggle("•", "Lijst", list === "bullet", listItem("bullet"))}
+				{toggle("1.", "Genummerde lijst", list === "number", listItem("number"))}
+			</Toolbar.Group>
 			<Toolbar.Separator className="separator" />
 			<LinkPopover send={send} />
+			<Toolbar.Separator className="separator" />
+			<Toolbar.Group className="tool-group" aria-label="Geschiedenis">
+				{button("↶", "Ongedaan maken", () => send({ type: "history.undo" }))}
+				{button("↷", "Opnieuw", () => send({ type: "history.redo" }))}
+			</Toolbar.Group>
+			<span className="spacer"></span>
+			{data.saved && (
+				<span role="status" className="saved">
+					Opgeslagen
+				</span>
+			)}
+			<Toolbar.Button type="submit" className="button primary">
+				Opslaan
+			</Toolbar.Button>
 		</Toolbar.Root>
 	);
 }
@@ -221,16 +274,6 @@ function EditForm() {
 			<FormatToolbar />
 			<PortableTextEditable className="editable" />
 			<input type="hidden" name="value" ref={field} />
-			<div className="row">
-				<button type="submit" className="button primary">
-					Opslaan
-				</button>
-				{data.saved && (
-					<span role="status" className="saved">
-						De tekst is opgeslagen.
-					</span>
-				)}
-			</div>
 		</form>
 	);
 }
