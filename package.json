@@ -1,0 +1,33 @@
+{
+	"name": "hono-site",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "cf dev",
+		"build": "cf build",
+		"deploy": "cf deploy",
+		"check": "cf workers types && vp check",
+		"format": "vp fmt"
+	},
+	"dependencies": {
+		"@base-ui/react": "^1.9.0",
+		"@portabletext/editor": "^8.2.15",
+		"@portabletext/to-html": "^6.0.0",
+		"better-auth": "^1.7.27",
+		"hono": "^4.13.21",
+		"react": "^19.3.1",
+		"react-dom": "^19.3.1"
+	},
+	"devDependencies": {
+		"@cloudflare/vite-plugin": "^2.0.0-rc.0",
+		"@types/react": "^19.3.0",
+		"@types/react-dom": "^19.3.0",
+		"cf": "^1.0.0-rc.4",
+		"typescript": "^7.0.2",
+		"vite": "npm:@voidzero-dev/vite-plus-core@1.4.0",
+		"vite-plus": "1.4.0"
+	},
+	"engines": {
+		"node": "^22.23.0 || ^24.22.0 || ^26.12.0"
+	}
+}

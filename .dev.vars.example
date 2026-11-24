@@ -1,0 +1,5 @@
+# Copy to .dev.vars (gitignored); `cf dev` and `cf deploy --secrets-file .dev.vars` read it.
+RECAPTCHA_SECRET=
+# Editing only (README, "Editing").
+OIDC_CLIENT_SECRET=
+BETTER_AUTH_SECRET=
