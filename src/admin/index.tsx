@@ -156,7 +156,7 @@ admin.post("/admin/teksten/:page/:name/", async (c) => {
 
 function findBlock(page: string, name: string) {
 	if (!adminPages().some((p) => p.page === page)) return undefined;
-	const blocks: Record<string, { label: string; text: string }> = pages[page as PageName].blocks;
+	const blocks: Record<string, { label: string }> = pages[page as PageName].blocks;
 	if (!Object.hasOwn(blocks, name)) return undefined;
 	return { page: page as PageName, name, def: blocks[name] };
 }
@@ -191,6 +191,8 @@ function Shell(props: { title: string; script?: boolean; children: Child }) {
 					<meta name="viewport" content="width=device-width, initial-scale=1" />
 					<meta name="robots" content="noindex" />
 					<title>{props.title} - Beheer</title>
+					{/* The site's stylesheet, so texts look as on the page (text-styles.ts). */}
+					<link rel="stylesheet" href="/style.css" />
 					<link rel="stylesheet" href={asset("/src/admin/admin.css", "/admin/style.css")} />
 					{props.script && (
 						<script type="module" src={asset("/src/admin/admin.tsx", "/admin/admin.js")}></script>

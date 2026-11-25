@@ -30,21 +30,33 @@ import {
 	getActiveStyle,
 	isActiveDecorator,
 } from "@portabletext/editor/selectors";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { blockStyles, decorators, linkStyles } from "../text-styles.ts";
 import type { AdminData } from "./index.tsx";
 
 // What the customer can do: everything @portabletext/to-html renders on the
-// public pages without custom components, and images (blocks.ts, media.ts).
+// public pages without custom components, images (blocks.ts, media.ts), and
+// the site's own text styles (text-styles.ts).
 const schemaDefinition = defineSchema({
 	decorators: [
 		{ name: "strong" },
 		{ name: "em" },
 		{ name: "underline" },
 		{ name: "strike-through" },
+		...Object.keys(decorators).map((name) => ({ name })),
 	],
-	styles: [{ name: "normal" }, { name: "h2" }, { name: "h3" }, { name: "blockquote" }],
-	annotations: [{ name: "link", fields: [{ name: "href", type: "string" }] }],
+	styles: [
+		{ name: "normal" },
+		{ name: "h2" },
+		{ name: "h3" },
+		{ name: "blockquote" },
+		...Object.keys(blockStyles).map((name) => ({ name })),
+	],
+	annotations: ["link", ...Object.keys(linkStyles)].map((name) => ({
+		name,
+		fields: [{ name: "href", type: "string" }],
+	})),
 	lists: [{ name: "bullet" }, { name: "number" }],
 	inlineObjects: [],
 	blockObjects: [
@@ -90,6 +102,15 @@ const nodes = [
 			if (node.style === "h2") return <h2 {...attributes}>{children}</h2>;
 			if (node.style === "h3") return <h3 {...attributes}>{children}</h3>;
 			if (node.style === "blockquote") return <blockquote {...attributes}>{children}</blockquote>;
+			const custom = node.style ? blockStyles[node.style] : undefined;
+			if (custom) {
+				const Tag = custom.tag as "p";
+				return (
+					<Tag {...attributes} className={custom.class}>
+						{children}
+					</Tag>
+				);
+			}
 			return <p {...attributes}>{children}</p>;
 		},
 	}),
@@ -97,6 +118,15 @@ const nodes = [
 	defineDecorator({ type: "em", render: ({ children }) => <em>{children}</em> }),
 	defineDecorator({ type: "underline", render: ({ children }) => <u>{children}</u> }),
 	defineDecorator({ type: "strike-through", render: ({ children }) => <s>{children}</s> }),
+	...Object.entries(decorators).map(([type, d]) =>
+		defineDecorator({
+			type,
+			render: ({ children }) => {
+				const Tag = d.tag as "span";
+				return <Tag className={d.class}>{children}</Tag>;
+			},
+		}),
+	),
 	defineBlockObject({
 		type: "image",
 		render: ({ attributes, children, node, selected }) => {
@@ -137,12 +167,19 @@ const nodes = [
 			);
 		},
 	}),
-	defineAnnotation({
-		type: "link",
-		render: ({ children, annotation }) => (
-			<a href={typeof annotation.href === "string" ? annotation.href : undefined}>{children}</a>
-		),
-	}),
+	...["link", ...Object.keys(linkStyles)].map((type) =>
+		defineAnnotation({
+			type,
+			render: ({ children, annotation }) => (
+				<a
+					href={typeof annotation.href === "string" ? annotation.href : undefined}
+					className={linkStyles[type]?.class}
+				>
+					{children}
+				</a>
+			),
+		}),
+	),
 ];
 
 const data = JSON.parse(document.getElementById("admin-data")!.textContent!) as AdminData;
@@ -201,6 +238,12 @@ function FormatToolbar() {
 	const italic = useEditorSelector(editor, isActiveDecorator("em"));
 	const underline = useEditorSelector(editor, isActiveDecorator("underline"));
 	const strike = useEditorSelector(editor, isActiveDecorator("strike-through"));
+	// The site's own decorators that are on, as one string so it compares by value.
+	const own = useEditorSelector(editor, (s) =>
+		Object.keys(decorators)
+			.filter((name) => isActiveDecorator(name)(s))
+			.join(" "),
+	).split(" ");
 
 	const send = (event: Parameters<typeof editor.send>[0]) => {
 		editor.send(event);
@@ -239,17 +282,30 @@ function FormatToolbar() {
 				{toggle("I", "Cursief", italic, decorator("em"))}
 				{toggle("U", "Onderstreept", underline, decorator("underline"))}
 				{toggle("S", "Doorgehaald", strike, decorator("strike-through"))}
+				{Object.entries(decorators).map(([name, d]) => (
+					<Fragment key={name}>
+						{toggle(d.label, d.label, own.includes(name), decorator(name))}
+					</Fragment>
+				))}
 			</Toolbar.Group>
 			<Toolbar.Separator className="separator" />
 			<Toolbar.Group className="tool-group" aria-label="Alinea">
 				{toggle("H2", "Kop", style === "h2", blockStyle("h2"))}
 				{toggle("H3", "Subkop", style === "h3", blockStyle("h3"))}
 				{toggle("❝", "Citaat", style === "blockquote", blockStyle("blockquote"))}
+				{Object.entries(blockStyles).map(([name, s]) => (
+					<Fragment key={name}>
+						{toggle(s.label, s.label, style === name, blockStyle(name))}
+					</Fragment>
+				))}
 				{toggle("•", "Lijst", list === "bullet", listItem("bullet"))}
 				{toggle("1.", "Genummerde lijst", list === "number", listItem("number"))}
 			</Toolbar.Group>
 			<Toolbar.Separator className="separator" />
-			<LinkPopover send={send} />
+			<LinkPopover name="link" label="Link" send={send} />
+			{Object.entries(linkStyles).map(([name, l]) => (
+				<LinkPopover key={name} name={name} label={l.label} send={send} />
+			))}
 			{data.media && <ImagePopover />}
 			{data.media && <GalleryPopover />}
 			<Toolbar.Separator className="separator" />
@@ -270,20 +326,25 @@ function FormatToolbar() {
 	);
 }
 
-// Adds, changes or removes the link on the selected text.
-function LinkPopover(props: { send: ReturnType<typeof useEditor>["send"] }) {
+// Adds, changes or removes the link on the selected text: a plain link, or
+// one of the site's link styles (text-styles.ts).
+function LinkPopover(props: {
+	name: string;
+	label: string;
+	send: ReturnType<typeof useEditor>["send"];
+}) {
 	const editor = useEditor();
 	const link = useEditorSelector(editor, (s) =>
-		getActiveAnnotations(s).find((a) => a._type === "link"),
+		getActiveAnnotations(s).find((a) => a._type === props.name),
 	);
 	const [open, setOpen] = useState(false);
 	const [href, setHref] = useState("");
 
 	const apply = () => {
 		setOpen(false);
-		if (link) props.send({ type: "annotation.remove", annotation: { name: "link" } });
+		if (link) props.send({ type: "annotation.remove", annotation: { name: props.name } });
 		if (href.trim() !== "") {
-			props.send({ type: "annotation.add", annotation: { name: "link", value: { href } } });
+			props.send({ type: "annotation.add", annotation: { name: props.name, value: { href } } });
 		}
 		editor.send({ type: "focus" });
 	};
@@ -299,12 +360,12 @@ function LinkPopover(props: { send: ReturnType<typeof useEditor>["send"] }) {
 			<Popover.Trigger
 				render={<Toolbar.Button className="tool" data-pressed={link ? "" : undefined} />}
 			>
-				Link
+				{props.label}
 			</Popover.Trigger>
 			<Popover.Portal>
 				<Popover.Positioner sideOffset={4} align="start">
 					<Popover.Popup className="popup link-popup">
-						<Popover.Title className="popup-title">Link</Popover.Title>
+						<Popover.Title className="popup-title">{props.label}</Popover.Title>
 						<Input
 							className="input"
 							type="url"
