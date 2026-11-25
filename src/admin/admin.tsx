@@ -11,6 +11,7 @@ import { Toggle } from "@base-ui/react/toggle";
 import { Toolbar } from "@base-ui/react/toolbar";
 import {
 	defineAnnotation,
+	defineBlockObject,
 	defineDecorator,
 	defineSchema,
 	defineTextBlock,
@@ -32,7 +33,7 @@ import { createRoot } from "react-dom/client";
 import type { AdminData } from "./index.tsx";
 
 // What the customer can do: everything @portabletext/to-html renders on the
-// public pages without custom components (blocks.ts).
+// public pages without custom components, and images (blocks.ts, media.ts).
 const schemaDefinition = defineSchema({
 	decorators: [
 		{ name: "strong" },
@@ -44,7 +45,17 @@ const schemaDefinition = defineSchema({
 	annotations: [{ name: "link", fields: [{ name: "href", type: "string" }] }],
 	lists: [{ name: "bullet" }, { name: "number" }],
 	inlineObjects: [],
-	blockObjects: [],
+	blockObjects: [
+		{
+			name: "image",
+			fields: [
+				{ name: "src", type: "string" },
+				{ name: "alt", type: "string" },
+				{ name: "width", type: "number" },
+				{ name: "height", type: "number" },
+			],
+		},
+	],
 });
 
 const nodes = [
@@ -67,6 +78,19 @@ const nodes = [
 	defineDecorator({ type: "em", render: ({ children }) => <em>{children}</em> }),
 	defineDecorator({ type: "underline", render: ({ children }) => <u>{children}</u> }),
 	defineDecorator({ type: "strike-through", render: ({ children }) => <s>{children}</s> }),
+	defineBlockObject({
+		type: "image",
+		render: ({ attributes, children, node, selected }) => {
+			const image = node as { src?: string; alt?: string };
+			return (
+				<figure {...attributes} className={selected ? "pt-image selected" : "pt-image"}>
+					{children}
+					<img src={image.src} alt={image.alt ?? ""} />
+					{image.alt ? <figcaption>Alt-tekst: {image.alt}</figcaption> : null}
+				</figure>
+			);
+		},
+	}),
 	defineAnnotation({
 		type: "link",
 		render: ({ children, annotation }) => (
@@ -180,6 +204,7 @@ function FormatToolbar() {
 			</Toolbar.Group>
 			<Toolbar.Separator className="separator" />
 			<LinkPopover send={send} />
+			{data.media && <ImagePopover />}
 			<Toolbar.Separator className="separator" />
 			<Toolbar.Group className="tool-group" aria-label="Geschiedenis">
 				{button("↶", "Ongedaan maken", () => send({ type: "history.undo" }))}
@@ -250,6 +275,93 @@ function LinkPopover(props: { send: ReturnType<typeof useEditor>["send"] }) {
 						<div className="row">
 							<button type="button" className="button primary" onClick={apply}>
 								{href.trim() === "" && link ? "Verwijderen" : "Toepassen"}
+							</button>
+						</div>
+					</Popover.Popup>
+				</Popover.Positioner>
+			</Popover.Portal>
+		</Popover.Root>
+	);
+}
+
+// Uploads an image to R2 (POST /admin/media) and inserts it as an image block
+// at the cursor. The text keeps only the path; Save stores it like the rest.
+function ImagePopover() {
+	const editor = useEditor();
+	const [open, setOpen] = useState(false);
+	const [file, setFile] = useState<File | null>(null);
+	const [alt, setAlt] = useState("");
+	const [busy, setBusy] = useState(false);
+	const [problem, setProblem] = useState("");
+
+	const insert = async () => {
+		if (!file) return setProblem("Kies een afbeelding.");
+		if (alt.trim() === "") return setProblem("Beschrijf de afbeelding voor wie hem niet ziet.");
+		setBusy(true);
+		setProblem("");
+		try {
+			const bitmap = await createImageBitmap(file);
+			const body = new FormData();
+			body.append("file", file);
+			const res = await fetch("/admin/media", { method: "POST", body });
+			if (!res.ok) throw new Error(await res.text());
+			const { src } = (await res.json()) as { src: string };
+			editor.send({
+				type: "insert.block object",
+				blockObject: {
+					name: "image",
+					value: { src, alt: alt.trim(), width: bitmap.width, height: bitmap.height },
+				},
+				placement: "auto",
+			});
+			editor.send({ type: "focus" });
+			setOpen(false);
+		} catch (e) {
+			setProblem((e as Error).message || "Uploaden is niet gelukt.");
+		} finally {
+			setBusy(false);
+		}
+	};
+
+	return (
+		<Popover.Root
+			open={open}
+			onOpenChange={(next) => {
+				if (next) {
+					setFile(null);
+					setAlt("");
+					setProblem("");
+				}
+				setOpen(next);
+			}}
+		>
+			<Popover.Trigger render={<Toolbar.Button className="tool" />}>Afbeelding</Popover.Trigger>
+			<Popover.Portal>
+				<Popover.Positioner sideOffset={4} align="start">
+					<Popover.Popup className="popup link-popup">
+						<Popover.Title className="popup-title">Afbeelding</Popover.Title>
+						<input
+							className="file"
+							type="file"
+							accept="image/jpeg,image/png,image/webp,image/avif"
+							aria-label="Afbeelding (JPEG, PNG, WebP of AVIF, tot 5 MB)"
+							onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+						/>
+						<Input
+							className="input"
+							placeholder="Wat staat erop?"
+							aria-label="Alt-tekst"
+							value={alt}
+							onValueChange={setAlt}
+						/>
+						{problem && (
+							<p className="problem" role="alert">
+								{problem}
+							</p>
+						)}
+						<div className="row">
+							<button type="button" className="button primary" onClick={insert} disabled={busy}>
+								{busy ? "Bezig…" : "Invoegen"}
 							</button>
 						</div>
 					</Popover.Popup>

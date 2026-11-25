@@ -4,6 +4,7 @@ import { admin } from "./admin/index.tsx";
 import { blocks } from "./blocks.ts";
 import { handleContact } from "./contact.ts";
 import { ContactForm, Layout } from "./layout.tsx";
+import { serveMedia } from "./media.ts";
 
 // Pages render here with Hono JSX. Files in public/ (CSS, JS, images) are
 // served before the Worker runs.
@@ -92,6 +93,9 @@ app.get("/verzonden/", (c) =>
 );
 
 app.post("/api/contact", (c) => handleContact(c.req.raw));
+
+// Images in the texts, from R2 (media.ts).
+app.get("/media/:name", (c) => serveMedia(c.req.param("name"), c.req.raw));
 
 // /admin/ and /api/auth/*, only when editing is on (admin/auth.ts).
 app.route("/", admin);

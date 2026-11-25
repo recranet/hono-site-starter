@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { toHTML } from "@portabletext/to-html";
+import { escapeHTML, toHTML, type PortableTextComponents } from "@portabletext/to-html";
 import { raw } from "hono/html";
 
 // The site's pages and the text blocks the customer can edit on each. The
@@ -63,7 +63,7 @@ export async function blocks<P extends PageName>(page: P) {
 	for (const row of rows?.results ?? []) saved.set(row.name, JSON.parse(row.value));
 	const defined: Page["blocks"] = pages[page].blocks;
 	return (name: keyof (typeof pages)[P]["blocks"] & string) =>
-		raw(toHTML(saved.get(name) ?? textToBlocks(defined[name].text)));
+		raw(toHTML(saved.get(name) ?? textToBlocks(defined[name].text), { components }));
 }
 
 // One block's stored value, or its default as Portable Text, for the editor.
@@ -92,19 +92,58 @@ export async function saveBlock(
 		.run();
 }
 
-// The editor's JSON as posted. Only text blocks, and not too large; to-html
-// escapes the text and drops unsafe link URLs when it renders.
+// An image block (media.ts): `src` is /media/<id>.<ext>, the rest describes it.
+type ImageBlock = {
+	_type: "image";
+	_key: string;
+	src: string;
+	alt: string;
+	width?: number;
+	height?: number;
+};
+
+const MEDIA_SRC = /^\/media\/[0-9a-f-]{36}\.(jpg|png|webp|avif)$/;
+
+const components: PortableTextComponents = {
+	types: {
+		image: ({ value }: { value: ImageBlock }) => {
+			// parseBlocks checked the stored value; check src again before it goes out.
+			if (!MEDIA_SRC.test(value.src)) return "";
+			const size =
+				value.width && value.height
+					? ` width="${Number(value.width)}" height="${Number(value.height)}"`
+					: "";
+			return `<img src="${value.src}" alt="${escapeHTML(value.alt ?? "")}"${size} loading="lazy">`;
+		},
+	},
+};
+
+// The editor's JSON as posted. Only text and image blocks, and not too large;
+// to-html escapes the text and drops unsafe link URLs when it renders.
 export function parseBlocks(json: string): PortableTextBlock[] | undefined {
 	if (json.length > 100_000) return undefined;
 	try {
 		const value: unknown = JSON.parse(json);
 		if (!Array.isArray(value)) return undefined;
-		return value.every((b) => b?._type === "block" && Array.isArray(b.children))
-			? value
-			: undefined;
+		return value.every(isBlock) ? value : undefined;
 	} catch {
 		return undefined;
 	}
+}
+
+function isBlock(b: unknown): boolean {
+	if (typeof b !== "object" || b === null) return false;
+	const block = b as Record<string, unknown>;
+	if (block._type === "block") return Array.isArray(block.children);
+	if (block._type !== "image") return false;
+	const size = (n: unknown) => n === undefined || (Number.isInteger(n) && (n as number) > 0);
+	return (
+		typeof block.src === "string" &&
+		MEDIA_SRC.test(block.src) &&
+		typeof block.alt === "string" &&
+		size(block.width) &&
+		size(block.height)
+	);
 }
 
 function textToBlocks(text: string): PortableTextBlock[] {

@@ -10,6 +10,7 @@ import {
 	type PageName,
 	type PortableTextBlock,
 } from "../blocks.ts";
+import { media, uploadMedia } from "../media.ts";
 import { createAuth, editing } from "./auth.ts";
 
 // The customer's admin: one screen per text at /admin/teksten/<page>/<name>/.
@@ -27,6 +28,8 @@ export type AdminData = {
 	pagePath: string;
 	value: PortableTextBlock[];
 	saved: boolean;
+	// Whether images can be added (the MEDIA binding).
+	media: boolean;
 };
 
 for (const path of ["/admin/*", "/api/auth/*"]) {
@@ -83,12 +86,17 @@ admin.get("/admin/", async (c) => {
 });
 
 // Everything below needs a session.
-admin.use("/admin/teksten/*", async (c, next) => {
-	const session = await c.var.auth.api.getSession({ headers: c.req.raw.headers });
-	if (!session) return c.redirect("/admin/", 303);
-	c.set("email", session.user.email);
-	await next();
-});
+for (const path of ["/admin/teksten/*", "/admin/media"]) {
+	admin.use(path, async (c, next) => {
+		const session = await c.var.auth.api.getSession({ headers: c.req.raw.headers });
+		if (!session) return c.redirect("/admin/", 303);
+		c.set("email", session.user.email);
+		await next();
+	});
+}
+
+// An image for a text (media.ts); the editor puts the returned path in the text.
+admin.post("/admin/media", (c) => uploadMedia(c.req.raw));
 
 admin.get("/admin/teksten/:page/:name/", async (c) => {
 	const found = findBlock(c.req.param("page"), c.req.param("name"));
@@ -106,6 +114,7 @@ admin.get("/admin/teksten/:page/:name/", async (c) => {
 		pagePath: pages[found.page].path,
 		value: await readBlock(found.page, found.name),
 		saved: c.req.query("opgeslagen") !== undefined,
+		media: media() !== undefined,
 	};
 	return c.html(
 		<Shell title={found.def.label} script>

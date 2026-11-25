@@ -48,6 +48,12 @@ Register the site at the OpenID provider with redirect URI `https://<host>/api/a
 openssl rand -base64 32 | sed 's/^/BETTER_AUTH_SECRET=/' >> .dev.vars
 ```
 
+For images in the texts, create an R2 bucket and put its name in `MEDIA` in `cloudflare.config.ts`; the editor then shows "Afbeelding":
+
+```bash
+cf r2 buckets create --name example-nl-media
+```
+
 ## Deploy
 
 ```bash

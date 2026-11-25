@@ -42,6 +42,8 @@ export default defineConfig({
 			//   OIDC_CLIENT_ID: bindings.text("<CLIENT_ID>"),
 			//   OIDC_CLIENT_SECRET: bindings.secret(),
 			//   BETTER_AUTH_SECRET: bindings.secret(),
+			// Images in the texts (README, "Editing"): an R2 bucket.
+			//   MEDIA: bindings.r2({ name: "<BUCKET_NAME>" }),
 		},
 	},
 });
