@@ -19,9 +19,9 @@ export default defineConfig({
 		// Workers Logs on: the Worker logs failed reCAPTCHA checks and sends.
 		workersDev: true,
 		observability: { enabled: true },
-		// The hostname. A Custom Domain, which also creates its DNS record:
-		//   domains: ["example.nl", "www.example.nl"],
-		// Or a route, where the zone has a wildcard record and a catch-all route
+		// The hostnames are Custom Domains the console attaches, so no `domains`
+		// here: a list would replace the Worker's Custom Domains on deploy.
+		// A route only where the zone has a wildcard record and a catch-all route
 		// that would win over a Custom Domain. Add `triggers` to the cf/config import.
 		//   triggers: [triggers.fetch({ pattern: "example.nl/*", zone: "example.nl" })],
 		env: {
