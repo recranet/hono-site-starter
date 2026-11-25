@@ -4,6 +4,7 @@
 // React because @portabletext/editor needs it; the controls are Base UI,
 // styled in admin.css. It renders from the JSON the server put in the page
 // (index.tsx), and Save is a plain form POST.
+import { Dialog } from "@base-ui/react/dialog";
 import { Input } from "@base-ui/react/input";
 import { Popover } from "@base-ui/react/popover";
 import { Select } from "@base-ui/react/select";
@@ -19,6 +20,7 @@ import {
 	PortableTextEditable,
 	useEditor,
 	useEditorSelector,
+	type BlockPath,
 	type PortableTextBlock,
 } from "@portabletext/editor";
 import { NodePlugin } from "@portabletext/editor/plugins";
@@ -28,7 +30,7 @@ import {
 	getActiveStyle,
 	isActiveDecorator,
 } from "@portabletext/editor/selectors";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { AdminData } from "./index.tsx";
 
@@ -66,6 +68,15 @@ type Image = { _key?: string; src: string; alt: string; width?: number; height?:
 // serves the original otherwise.
 const preview = (src?: string) => (src ? `${src}?w=480` : undefined);
 
+// The gallery's render can't hold state, so its Bewerken button sends the
+// block's path and images here, and GalleryEditor (outside the editable area,
+// so typing in the dialog doesn't reach the editor) opens the dialog.
+type GalleryEdit = { path: BlockPath; images: Image[] };
+const galleryEdits = new EventTarget();
+function editGallery(path: BlockPath, images: Image[]) {
+	galleryEdits.dispatchEvent(new CustomEvent<GalleryEdit>("edit", { detail: { path, images } }));
+}
+
 const nodes = [
 	defineTextBlock({
 		type: "block",
@@ -101,7 +112,7 @@ const nodes = [
 	}),
 	defineBlockObject({
 		type: "gallery",
-		render: ({ attributes, children, node, selected }) => {
+		render: ({ attributes, children, node, path, selected }) => {
 			const images = ((node as { images?: Image[] }).images ?? []) as Image[];
 			return (
 				<figure {...attributes} className={selected ? "pt-gallery selected" : "pt-gallery"}>
@@ -111,7 +122,17 @@ const nodes = [
 							<img key={image._key ?? image.src} src={preview(image.src)} alt={image.alt} />
 						))}
 					</div>
-					<figcaption>Galerij, {images.length} afbeeldingen</figcaption>
+					<figcaption contentEditable={false}>
+						Galerij, {images.length} afbeeldingen{" "}
+						<button
+							type="button"
+							className="button small"
+							onMouseDown={(event) => event.preventDefault()}
+							onClick={() => editGallery(path as BlockPath, images)}
+						>
+							Bewerken
+						</button>
+					</figcaption>
 				</figure>
 			);
 		},
@@ -490,6 +511,142 @@ function GalleryPopover() {
 	);
 }
 
+// Edits a gallery in place: alt texts, order, remove, add. Toepassen writes
+// the list back into the same block; Save stores it as usual.
+function GalleryEditor() {
+	const editor = useEditor();
+	const [edit, setEdit] = useState<GalleryEdit | null>(null);
+	const [images, setImages] = useState<Image[]>([]);
+	const [busy, setBusy] = useState(false);
+	const [problem, setProblem] = useState("");
+
+	useEffect(() => {
+		const open = (event: Event) => {
+			const detail = (event as CustomEvent<GalleryEdit>).detail;
+			setEdit(detail);
+			setImages(detail.images.map((image) => ({ ...image })));
+			setProblem("");
+		};
+		galleryEdits.addEventListener("edit", open);
+		return () => galleryEdits.removeEventListener("edit", open);
+	}, []);
+
+	const change = (i: number, next: Partial<Image>) =>
+		setImages(images.map((image, j) => (j === i ? { ...image, ...next } : image)));
+	const move = (i: number, by: number) => {
+		const list = [...images];
+		const [image] = list.splice(i, 1);
+		list.splice(i + by, 0, image);
+		setImages(list);
+	};
+
+	const add = async (files: File[]) => {
+		setBusy(true);
+		setProblem("");
+		try {
+			const added: Image[] = [];
+			for (const [i, file] of files.entries()) {
+				added.push({ _key: `g${Date.now()}${i}`, ...(await upload(file, "")) });
+			}
+			setImages((current) => [...current, ...added]);
+		} catch (e) {
+			setProblem((e as Error).message || "Uploaden is niet gelukt.");
+		} finally {
+			setBusy(false);
+		}
+	};
+
+	const apply = () => {
+		if (!edit) return;
+		if (images.length === 0) return setProblem("Een galerij heeft minstens een afbeelding.");
+		if (images.some((image) => image.alt.trim() === ""))
+			return setProblem("Beschrijf elke afbeelding voor wie hem niet ziet.");
+		editor.send({
+			type: "block.set",
+			at: edit.path,
+			props: { images: images.map((image) => ({ ...image, alt: image.alt.trim() })) },
+		});
+		setEdit(null);
+	};
+
+	return (
+		<Dialog.Root open={edit !== null} onOpenChange={(open) => !open && setEdit(null)}>
+			<Dialog.Portal>
+				<Dialog.Backdrop className="backdrop" />
+				<Dialog.Popup className="popup dialog">
+					<Dialog.Title className="popup-title">Galerij bewerken</Dialog.Title>
+					<ol className="gallery-list">
+						{images.map((image, i) => (
+							<li key={image._key ?? image.src}>
+								<img src={preview(image.src)} alt="" />
+								<Input
+									className="input"
+									placeholder="Wat staat erop?"
+									aria-label={`Alt-tekst van afbeelding ${i + 1}`}
+									value={image.alt}
+									onValueChange={(alt) => change(i, { alt })}
+								/>
+								<button
+									type="button"
+									className="button small"
+									aria-label="Omhoog"
+									disabled={i === 0}
+									onClick={() => move(i, -1)}
+								>
+									↑
+								</button>
+								<button
+									type="button"
+									className="button small"
+									aria-label="Omlaag"
+									disabled={i === images.length - 1}
+									onClick={() => move(i, 1)}
+								>
+									↓
+								</button>
+								<button
+									type="button"
+									className="button small"
+									aria-label="Verwijderen"
+									onClick={() => setImages(images.filter((_, j) => j !== i))}
+								>
+									×
+								</button>
+							</li>
+						))}
+					</ol>
+					<label className="add-images">
+						Afbeeldingen toevoegen
+						<input
+							className="file"
+							type="file"
+							multiple
+							accept={ACCEPT}
+							disabled={busy}
+							onChange={(event) => {
+								const files = [...(event.target.files ?? [])];
+								event.target.value = "";
+								if (files.length > 0) void add(files);
+							}}
+						/>
+					</label>
+					{problem && (
+						<p className="problem" role="alert">
+							{problem}
+						</p>
+					)}
+					<div className="row">
+						<button type="button" className="button primary" onClick={apply} disabled={busy}>
+							{busy ? "Bezig…" : "Toepassen"}
+						</button>
+						<Dialog.Close className="button">Annuleren</Dialog.Close>
+					</div>
+				</Dialog.Popup>
+			</Dialog.Portal>
+		</Dialog.Root>
+	);
+}
+
 // The editor reports changes with a delay, so read its value at submit.
 function EditForm() {
 	const editor = useEditor();
@@ -530,6 +687,7 @@ function Screen() {
 			<main>
 				<EditForm />
 			</main>
+			<GalleryEditor />
 		</EditorProvider>
 	);
 }

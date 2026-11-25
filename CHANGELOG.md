@@ -4,6 +4,7 @@ Each change names the files it touches, so a site can diff just those (README, "
 
 ## 2026-11-25
 
+- Galleries are editable: Bewerken under a gallery opens a Base UI Dialog to change alt texts, reorder, remove and add images; Toepassen updates the block in place (`block.set`). `src/admin/admin.tsx`, `src/admin/admin.css`.
 - Galleries and scaled images: a "Galerij" button inserts a `gallery` block (`images`: src, alt, width, height each), shown as a square grid that opens in a lightbox (`public/gallery.js`, the dialog in `src/layout.tsx`). With `IMAGES` (Cloudflare Images) `/media/<id>?w=<width>` serves WebP at 480, 960, 1440, 1920 or 2560 px, cached at the edge, and images get a srcset. Uploads up to 20 MB. `src/media.ts`, `src/blocks.ts`, `src/index.tsx`, `src/layout.tsx`, `src/admin/admin.tsx`, `src/admin/admin.css`, `public/gallery.js` (new), `cloudflare.config.ts`, `README.md`.
 - Images in the texts: an "Afbeelding" button uploads to R2 (`MEDIA`) and inserts a Portable Text `image` block (`src`, `alt`, `width`, `height`); public pages render it as `<img>`, served from `/media/<id>`. `src/media.ts` (new), `src/admin/index.tsx`, `src/admin/admin.tsx`, `src/admin/admin.css`, `src/blocks.ts`, `src/index.tsx`, `cloudflare.config.ts`, `README.md`.
 
