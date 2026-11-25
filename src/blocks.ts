@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { escapeHTML, toHTML, type PortableTextComponents } from "@portabletext/to-html";
 import { raw } from "hono/html";
+import { srcset } from "./media.ts";
 
 // The site's pages and the text blocks the customer can edit on each. The
 // navbar lists the pages in this order. `text` shows until the
@@ -92,36 +93,48 @@ export async function saveBlock(
 		.run();
 }
 
-// An image block (media.ts): `src` is /media/<id>.<ext>, the rest describes it.
-type ImageBlock = {
-	_type: "image";
-	_key: string;
-	src: string;
-	alt: string;
-	width?: number;
-	height?: number;
-};
+// An image (media.ts): `src` is /media/<id>.<ext>, the rest describes it. An
+// image block is one on its own; a gallery block holds several.
+type Image = { _key: string; src: string; alt: string; width?: number; height?: number };
+type GalleryBlock = { _type: "gallery"; _key: string; images: Image[] };
 
 const MEDIA_SRC = /^\/media\/[0-9a-f-]{36}\.(jpg|png|webp|avif)$/;
 
+// One <img>. parseBlocks checked the stored value; src is checked again
+// before it goes out. `sizes` says how wide it shows, for the srcset.
+function img(image: Image, sizes: string, attrs = "") {
+	if (!MEDIA_SRC.test(image.src)) return "";
+	const w = Number(image.width) || undefined;
+	const h = Number(image.height) || undefined;
+	const set = srcset(image.src, w);
+	return [
+		`<img src="${image.src}" alt="${escapeHTML(image.alt ?? "")}"`,
+		w && h ? ` width="${w}" height="${h}"` : "",
+		set ? ` srcset="${set}" sizes="${sizes}"` : "",
+		` loading="lazy" decoding="async"${attrs}>`,
+	].join("");
+}
+
 const components: PortableTextComponents = {
 	types: {
-		image: ({ value }: { value: ImageBlock }) => {
-			// parseBlocks checked the stored value; check src again before it goes out.
-			if (!MEDIA_SRC.test(value.src)) return "";
-			const size =
-				value.width && value.height
-					? ` width="${Number(value.width)}" height="${Number(value.height)}"`
-					: "";
-			return `<img src="${value.src}" alt="${escapeHTML(value.alt ?? "")}"${size} loading="lazy">`;
-		},
+		image: ({ value }: { value: Image }) =>
+			`<figure class="my-6">${img(value, "(min-width: 48rem) 42rem, 100vw", ' class="h-auto max-w-full rounded-md"')}</figure>`,
+		// A grid of square crops; each opens large in the lightbox (public/gallery.js).
+		gallery: ({ value }: { value: GalleryBlock }) =>
+			`<div class="gallery my-6 grid grid-cols-2 gap-3 md:grid-cols-3">${value.images
+				.filter((image) => MEDIA_SRC.test(image.src))
+				.map(
+					(image) =>
+						`<a href="${image.src}" class="block overflow-hidden rounded-md" data-gallery>${img(image, "(min-width: 48rem) 33vw, 50vw", ' class="aspect-square size-full object-cover transition-transform hover:scale-105"')}</a>`,
+				)
+				.join("")}</div>`,
 	},
 };
 
-// The editor's JSON as posted. Only text and image blocks, and not too large;
-// to-html escapes the text and drops unsafe link URLs when it renders.
+// The editor's JSON as posted. Only text, image and gallery blocks, and not
+// too large; to-html escapes the text and drops unsafe link URLs when it renders.
 export function parseBlocks(json: string): PortableTextBlock[] | undefined {
-	if (json.length > 100_000) return undefined;
+	if (json.length > 200_000) return undefined;
 	try {
 		const value: unknown = JSON.parse(json);
 		if (!Array.isArray(value)) return undefined;
@@ -135,14 +148,24 @@ function isBlock(b: unknown): boolean {
 	if (typeof b !== "object" || b === null) return false;
 	const block = b as Record<string, unknown>;
 	if (block._type === "block") return Array.isArray(block.children);
-	if (block._type !== "image") return false;
+	if (block._type === "image") return isImage(block);
+	if (block._type === "gallery") {
+		const list = block.images;
+		return Array.isArray(list) && list.length > 0 && list.length <= 60 && list.every(isImage);
+	}
+	return false;
+}
+
+function isImage(i: unknown): boolean {
+	if (typeof i !== "object" || i === null) return false;
+	const image = i as Record<string, unknown>;
 	const size = (n: unknown) => n === undefined || (Number.isInteger(n) && (n as number) > 0);
 	return (
-		typeof block.src === "string" &&
-		MEDIA_SRC.test(block.src) &&
-		typeof block.alt === "string" &&
-		size(block.width) &&
-		size(block.height)
+		typeof image.src === "string" &&
+		MEDIA_SRC.test(image.src) &&
+		typeof image.alt === "string" &&
+		size(image.width) &&
+		size(image.height)
 	);
 }
 

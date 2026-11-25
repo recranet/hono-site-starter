@@ -42,8 +42,10 @@ export default defineConfig({
 			//   OIDC_CLIENT_ID: bindings.text("<CLIENT_ID>"),
 			//   OIDC_CLIENT_SECRET: bindings.secret(),
 			//   BETTER_AUTH_SECRET: bindings.secret(),
-			// Images in the texts (README, "Editing"): an R2 bucket.
+			// Images and galleries in the texts (README, "Editing"): an R2 bucket,
+			// and Cloudflare Images to serve them scaled (optional).
 			//   MEDIA: bindings.r2({ name: "<BUCKET_NAME>" }),
+			//   IMAGES: bindings.images(),
 		},
 	},
 });

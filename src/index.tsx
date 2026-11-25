@@ -95,7 +95,9 @@ app.get("/verzonden/", (c) =>
 app.post("/api/contact", (c) => handleContact(c.req.raw));
 
 // Images in the texts, from R2 (media.ts).
-app.get("/media/:name", (c) => serveMedia(c.req.param("name"), c.req.raw));
+app.get("/media/:name", (c) =>
+	serveMedia(c.req.param("name"), c.req.raw, c.executionCtx as ExecutionContext),
+);
 
 // /admin/ and /api/auth/*, only when editing is on (admin/auth.ts).
 app.route("/", admin);

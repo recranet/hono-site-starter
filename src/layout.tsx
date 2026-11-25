@@ -24,6 +24,7 @@ export function Layout(props: { title?: string; path?: string; form?: boolean; c
 					/>
 					<link rel="stylesheet" href="/style.css" />
 					<script src="/navbar.js" defer></script>
+					<script src="/gallery.js" defer></script>
 					<script
 						src="https://cdn.jsdelivr.net/npm/@alpinejs/focus@3.17.5/dist/cdn.min.js"
 						defer
@@ -45,6 +46,7 @@ export function Layout(props: { title?: string; path?: string; form?: boolean; c
 					</a>
 					<Navbar path={props.path} />
 					<main id="main">{props.children}</main>
+					<Lightbox />
 				</body>
 			</html>
 		</>
@@ -132,6 +134,36 @@ function Navbar(props: { path?: string }) {
 				</div>
 			</div>
 		</nav>
+	);
+}
+
+// The large view of a gallery image (public/gallery.js). Arrow keys and the
+// buttons step through the gallery; Escape or a click outside closes it.
+function Lightbox() {
+	const button =
+		"btn btn-square absolute top-1/2 -translate-y-1/2 bg-white/90 text-body hover:bg-white";
+	return (
+		<dialog
+			id="lightbox"
+			aria-label="Afbeelding"
+			class="m-auto max-h-none max-w-none bg-transparent p-0 backdrop:bg-black/85"
+		>
+			<img class="max-h-[90dvh] max-w-[92vw] rounded-md object-contain" alt="" />
+			<button type="button" data-step="-1" class={`${button} left-2`} aria-label="Vorige">
+				‹
+			</button>
+			<button type="button" data-step="1" class={`${button} right-2`} aria-label="Volgende">
+				›
+			</button>
+			<form method="dialog">
+				<button
+					class="btn btn-square absolute top-2 right-2 bg-white/90 text-body hover:bg-white"
+					aria-label="Sluiten"
+				>
+					×
+				</button>
+			</form>
+		</dialog>
 	);
 }
 

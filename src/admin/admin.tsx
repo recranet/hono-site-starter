@@ -55,8 +55,16 @@ const schemaDefinition = defineSchema({
 				{ name: "height", type: "number" },
 			],
 		},
+		// Several images, each { _key, src, alt, width, height }.
+		{ name: "gallery", fields: [{ name: "images", type: "array" }] },
 	],
 });
+
+type Image = { _key?: string; src: string; alt: string; width?: number; height?: number };
+
+// Small previews in the editor: /media/ scales them when IMAGES is on, and
+// serves the original otherwise.
+const preview = (src?: string) => (src ? `${src}?w=480` : undefined);
 
 const nodes = [
 	defineTextBlock({
@@ -85,8 +93,25 @@ const nodes = [
 			return (
 				<figure {...attributes} className={selected ? "pt-image selected" : "pt-image"}>
 					{children}
-					<img src={image.src} alt={image.alt ?? ""} />
+					<img src={preview(image.src)} alt={image.alt ?? ""} />
 					{image.alt ? <figcaption>Alt-tekst: {image.alt}</figcaption> : null}
+				</figure>
+			);
+		},
+	}),
+	defineBlockObject({
+		type: "gallery",
+		render: ({ attributes, children, node, selected }) => {
+			const images = ((node as { images?: Image[] }).images ?? []) as Image[];
+			return (
+				<figure {...attributes} className={selected ? "pt-gallery selected" : "pt-gallery"}>
+					{children}
+					<div>
+						{images.map((image) => (
+							<img key={image._key ?? image.src} src={preview(image.src)} alt={image.alt} />
+						))}
+					</div>
+					<figcaption>Galerij, {images.length} afbeeldingen</figcaption>
 				</figure>
 			);
 		},
@@ -205,6 +230,7 @@ function FormatToolbar() {
 			<Toolbar.Separator className="separator" />
 			<LinkPopover send={send} />
 			{data.media && <ImagePopover />}
+			{data.media && <GalleryPopover />}
 			<Toolbar.Separator className="separator" />
 			<Toolbar.Group className="tool-group" aria-label="Geschiedenis">
 				{button("↶", "Ongedaan maken", () => send({ type: "history.undo" }))}
@@ -284,8 +310,21 @@ function LinkPopover(props: { send: ReturnType<typeof useEditor>["send"] }) {
 	);
 }
 
-// Uploads an image to R2 (POST /admin/media) and inserts it as an image block
-// at the cursor. The text keeps only the path; Save stores it like the rest.
+// Uploads one image to R2 (POST /admin/media). The text keeps only its path
+// and size; Save stores it like the rest.
+async function upload(file: File, alt: string): Promise<Image> {
+	const bitmap = await createImageBitmap(file);
+	const body = new FormData();
+	body.append("file", file);
+	const res = await fetch("/admin/media", { method: "POST", body });
+	if (!res.ok) throw new Error(await res.text());
+	const { src } = (await res.json()) as { src: string };
+	return { src, alt: alt.trim(), width: bitmap.width, height: bitmap.height };
+}
+
+const ACCEPT = "image/jpeg,image/png,image/webp,image/avif";
+
+// One image, inserted as an image block at the cursor.
 function ImagePopover() {
 	const editor = useEditor();
 	const [open, setOpen] = useState(false);
@@ -300,18 +339,10 @@ function ImagePopover() {
 		setBusy(true);
 		setProblem("");
 		try {
-			const bitmap = await createImageBitmap(file);
-			const body = new FormData();
-			body.append("file", file);
-			const res = await fetch("/admin/media", { method: "POST", body });
-			if (!res.ok) throw new Error(await res.text());
-			const { src } = (await res.json()) as { src: string };
+			const value = await upload(file, alt);
 			editor.send({
 				type: "insert.block object",
-				blockObject: {
-					name: "image",
-					value: { src, alt: alt.trim(), width: bitmap.width, height: bitmap.height },
-				},
+				blockObject: { name: "image", value },
 				placement: "auto",
 			});
 			editor.send({ type: "focus" });
@@ -343,8 +374,8 @@ function ImagePopover() {
 						<input
 							className="file"
 							type="file"
-							accept="image/jpeg,image/png,image/webp,image/avif"
-							aria-label="Afbeelding (JPEG, PNG, WebP of AVIF, tot 5 MB)"
+							accept={ACCEPT}
+							aria-label="Afbeelding (JPEG, PNG, WebP of AVIF, tot 20 MB)"
 							onChange={(event) => setFile(event.target.files?.[0] ?? null)}
 						/>
 						<Input
@@ -354,6 +385,94 @@ function ImagePopover() {
 							value={alt}
 							onValueChange={setAlt}
 						/>
+						{problem && (
+							<p className="problem" role="alert">
+								{problem}
+							</p>
+						)}
+						<div className="row">
+							<button type="button" className="button primary" onClick={insert} disabled={busy}>
+								{busy ? "Bezig…" : "Invoegen"}
+							</button>
+						</div>
+					</Popover.Popup>
+				</Popover.Positioner>
+			</Popover.Portal>
+		</Popover.Root>
+	);
+}
+
+// Several images, inserted as one gallery block. Each needs its alt text.
+function GalleryPopover() {
+	const editor = useEditor();
+	const [open, setOpen] = useState(false);
+	const [items, setItems] = useState<{ file: File; alt: string }[]>([]);
+	const [busy, setBusy] = useState(false);
+	const [problem, setProblem] = useState("");
+
+	const insert = async () => {
+		if (items.length === 0) return setProblem("Kies een of meer afbeeldingen.");
+		if (items.some((item) => item.alt.trim() === ""))
+			return setProblem("Beschrijf elke afbeelding voor wie hem niet ziet.");
+		setBusy(true);
+		setProblem("");
+		try {
+			const images: Image[] = [];
+			for (const [i, item] of items.entries()) {
+				images.push({ _key: `g${Date.now()}${i}`, ...(await upload(item.file, item.alt)) });
+			}
+			editor.send({
+				type: "insert.block object",
+				blockObject: { name: "gallery", value: { images } },
+				placement: "auto",
+			});
+			editor.send({ type: "focus" });
+			setOpen(false);
+		} catch (e) {
+			setProblem((e as Error).message || "Uploaden is niet gelukt.");
+		} finally {
+			setBusy(false);
+		}
+	};
+
+	return (
+		<Popover.Root
+			open={open}
+			onOpenChange={(next) => {
+				if (next) {
+					setItems([]);
+					setProblem("");
+				}
+				setOpen(next);
+			}}
+		>
+			<Popover.Trigger render={<Toolbar.Button className="tool" />}>Galerij</Popover.Trigger>
+			<Popover.Portal>
+				<Popover.Positioner sideOffset={4} align="start">
+					<Popover.Popup className="popup link-popup gallery-popup">
+						<Popover.Title className="popup-title">Galerij</Popover.Title>
+						<input
+							className="file"
+							type="file"
+							multiple
+							accept={ACCEPT}
+							aria-label="Afbeeldingen (JPEG, PNG, WebP of AVIF, tot 20 MB per stuk)"
+							onChange={(event) =>
+								setItems([...(event.target.files ?? [])].map((file) => ({ file, alt: "" })))
+							}
+						/>
+						{items.map((item, i) => (
+							<Input
+								key={item.file.name + i}
+								className="input"
+								placeholder={`Wat staat er op ${item.file.name}?`}
+								aria-label={`Alt-tekst voor ${item.file.name}`}
+								value={item.alt}
+								onValueChange={(alt) =>
+									setItems(items.map((it, j) => (j === i ? { ...it, alt } : it)))
+								}
+							/>
+						))}
 						{problem && (
 							<p className="problem" role="alert">
 								{problem}
