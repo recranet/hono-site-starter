@@ -4,7 +4,7 @@
  * fonts (loaded in src/layout.tsx).
  *
  * `pnpm run css` compiles it to public/style.css (gitignored); build, dev and deploy run it first. Tailwind scans
- * the pages in src/ for classes; the admin has its own admin.css.
+ * the pages in src/ for classes. The admin loads this file before its own admin.css, for the text styles.
  */
 @import "tailwindcss" source(none);
 @source '..';
@@ -274,6 +274,19 @@
 		background-color: var(--color-primary);
 		width: min(100px, calc(28px + 6vw));
 		height: min(70px, calc(25px + 3.75vw));
+	}
+
+	/* Text styles from src/text-styles.ts. The admin loads this file too, so the editor shows them the same. */
+	.lead {
+		font-size: var(--text-xl);
+		line-height: var(--text-xl--line-height);
+		color: var(--color-muted);
+	}
+	.highlight {
+		border-radius: 0.125rem;
+		background-color: color-mix(in srgb, var(--color-secondary) 25%, transparent);
+		padding-inline: 0.125rem;
+		color: inherit;
 	}
 
 	/* Honeypot: hidden from people, filled in by bots */
