@@ -207,7 +207,7 @@ main {
 	outline: 2px solid var(--accent);
 	outline-offset: -1px;
 }
-.editable a {
+.editable a:not([class]) {
 	color: var(--accent);
 }
 .editable blockquote {
