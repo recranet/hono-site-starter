@@ -21,6 +21,9 @@ export default defineConfig({
 		observability: { enabled: true },
 		// The hostnames are Custom Domains the console attaches, so no `domains`
 		// here: a list would replace the Worker's Custom Domains on deploy.
+		// Redirects run at Cloudflare's edge, not in the Worker: http to https is
+		// the zone's Always Use HTTPS, the bare domain to www the console's
+		// redirect rule.
 		// A route only where the zone has a wildcard record and a catch-all route
 		// that would win over a Custom Domain. Add `triggers` to the cf/config import.
 		//   triggers: [triggers.fetch({ pattern: "example.nl/*", zone: "example.nl" })],
