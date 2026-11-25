@@ -125,8 +125,11 @@ main {
 	box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
 	outline: none;
 }
+/* Many texts: the list scrolls inside the space below the trigger instead of running off the screen. */
 .select-popup {
 	min-width: var(--anchor-width);
+	max-height: var(--available-height);
+	overflow-y: auto;
 }
 .select-group-label {
 	padding: 0.5rem 0.75rem 0.25rem;
