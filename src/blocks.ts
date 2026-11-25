@@ -1,16 +1,22 @@
 import { env } from "cloudflare:workers";
 import { escapeHTML, toHTML, type PortableTextComponents } from "@portabletext/to-html";
 import { raw } from "hono/html";
+import { languages, prefix, type Lang } from "./languages.ts";
 import { srcset } from "./media.ts";
 
 // The site's pages and the text blocks the customer can edit on each. The
-// navbar lists the pages in this order. `text` shows until the
+// navbar lists the pages of the current language in this order. `lang` is
+// one of `languages` (languages.ts); on a site with more than one, a page
+// in another language names the page it translates in `translates`, and the
+// language switch links the two. Keys are unique across languages (home,
+// "en-home"). `text` shows until the
 // customer saves the block; a blank line starts a new paragraph. The admin
 // lists them in this order. Names are part of the stored row: renaming one
 // loses its saved text.
 export const pages = {
 	home: {
 		title: "Home",
+		lang: "nl",
 		path: "/",
 		blocks: {
 			intro: {
@@ -25,6 +31,7 @@ export const pages = {
 	},
 	"over-ons": {
 		title: "Over ons",
+		lang: "nl",
 		path: "/over-ons/",
 		blocks: {
 			intro: { label: "Introductie", text: "Dit is een voorbeeldpagina met tekst." },
@@ -33,6 +40,7 @@ export const pages = {
 	},
 	contact: {
 		title: "Contact",
+		lang: "nl",
 		path: "/contact/",
 		blocks: {
 			intro: { label: "Introductie", text: "Neem contact met ons op." },
@@ -42,10 +50,39 @@ export const pages = {
 
 type Page = {
 	title: string;
+	lang?: Lang;
+	translates?: string;
+	// Without the language prefix: "/about/", not "/en/about/".
 	path: string;
 	blocks: Record<string, { label: string; text: string }>;
 };
 export type PageName = keyof typeof pages;
+const all: Record<string, Page> = pages;
+
+export function langOf(page: PageName): Lang {
+	return all[page].lang ?? languages[0];
+}
+
+// A page's URL path, with its language prefix.
+export function href(page: PageName) {
+	return prefix(langOf(page)) + all[page].path;
+}
+
+// The pages in a language, in navbar order.
+export function pagesIn(lang: Lang) {
+	return (Object.keys(pages) as PageName[]).filter((page) => langOf(page) === lang);
+}
+
+export function pageAt(path: string) {
+	return languages.flatMap(pagesIn).find((page) => href(page) === path);
+}
+
+// The same page in another language, if the site has it.
+export function translation(page: PageName, lang: Lang) {
+	const original = all[page].translates ?? page;
+	return pagesIn(lang).find((p) => p === original || all[p].translates === original);
+}
+
 export type PortableTextBlock = Exclude<Parameters<typeof toHTML>[0], unknown[]>;
 
 // D1 when editing is on (admin/auth.ts); a site without it shows the defaults.

@@ -3,13 +3,17 @@ import { csrf } from "hono/csrf";
 import { raw } from "hono/html";
 import type { Child } from "hono/jsx";
 import {
+	href,
+	langOf,
 	pages,
+	pagesIn,
 	parseBlocks,
 	readBlock,
 	saveBlock,
 	type PageName,
 	type PortableTextBlock,
 } from "../blocks.ts";
+import { languages } from "../languages.ts";
 import { media, uploadMedia } from "../media.ts";
 import { createAuth, editing } from "./auth.ts";
 
@@ -77,12 +81,24 @@ admin.post("/admin/uitloggen", async (c) => {
 	return res;
 });
 
+// The pages by language, in navbar order. With more than one language the
+// switcher shows the language after the title: "Home (EN)".
+function adminPages() {
+	return languages.flatMap(pagesIn).map((page) => ({
+		page,
+		title:
+			languages.length > 1
+				? `${pages[page].title} (${langOf(page).toUpperCase()})`
+				: pages[page].title,
+	}));
+}
+
 // Signed in: the first text. Not signed in: the provider, or why it refused.
 admin.get("/admin/", async (c) => {
 	const session = await c.var.auth.api.getSession({ headers: c.req.raw.headers });
 	if (!session) return c.req.query("fout") === "inloggen" ? c.html(<Refused />) : signIn(c);
-	const [page, def] = Object.entries(pages)[0];
-	return c.redirect(`/admin/teksten/${page}/${Object.keys(def.blocks)[0]}/`, 303);
+	const { page } = adminPages()[0];
+	return c.redirect(`/admin/teksten/${page}/${Object.keys(pages[page].blocks)[0]}/`, 303);
 });
 
 // Everything below needs a session.
@@ -103,15 +119,15 @@ admin.get("/admin/teksten/:page/:name/", async (c) => {
 	if (!found) return c.notFound();
 	const data: AdminData = {
 		email: c.var.email,
-		pages: Object.entries(pages).map(([page, def]) => ({
-			title: def.title,
-			texts: Object.entries(def.blocks).map(([name, block]) => ({
+		pages: adminPages().map(({ page, title }) => ({
+			title,
+			texts: Object.entries(pages[page].blocks).map(([name, block]) => ({
 				value: `${page}/${name}`,
 				label: block.label,
 			})),
 		})),
 		current: `${found.page}/${found.name}`,
-		pagePath: pages[found.page].path,
+		pagePath: href(found.page),
 		value: await readBlock(found.page, found.name),
 		saved: c.req.query("opgeslagen") !== undefined,
 		media: media() !== undefined,
@@ -139,7 +155,7 @@ admin.post("/admin/teksten/:page/:name/", async (c) => {
 });
 
 function findBlock(page: string, name: string) {
-	if (!Object.hasOwn(pages, page)) return undefined;
+	if (!adminPages().some((p) => p.page === page)) return undefined;
 	const blocks: Record<string, { label: string; text: string }> = pages[page as PageName].blocks;
 	if (!Object.hasOwn(blocks, name)) return undefined;
 	return { page: page as PageName, name, def: blocks[name] };

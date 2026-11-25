@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import { languages, messages, prefix } from "./languages.ts";
 
 // The contact form's POST: checks reCAPTCHA, then mails the message to MAIL_TO
 // with the Email Sending binding. Mounted in index.tsx as POST /api/contact.
@@ -15,9 +16,13 @@ export async function handleContact(request: Request): Promise<Response> {
 	const name = field("name");
 	const email = field("email");
 	const message = field("message");
+	// The form's language, for the messages and the thank-you page. The mail stays Dutch.
+	const lang = languages.find((l) => l === field("lang")) ?? languages[0];
+	const t = messages[lang].form;
+	const sent = prefix(lang) + messages[lang].sent.path;
 
 	// Honeypot: people leave it empty, bots fill it. Pretend it worked.
-	if (field("website") !== "") return redirect(url, "/verzonden/");
+	if (field("website") !== "") return redirect(url, sent);
 
 	if (
 		name === "" ||
@@ -27,11 +32,11 @@ export async function handleContact(request: Request): Promise<Response> {
 		email.length > LIMITS.email ||
 		message.length > LIMITS.message
 	) {
-		return error("Vul je naam, een geldig e-mailadres en een bericht in.");
+		return error(t.invalid);
 	}
 
 	if (!(await recaptchaPassed(field("recaptcha_token"), request, url))) {
-		return error("De reCAPTCHA-controle is mislukt. Probeer het opnieuw.");
+		return error(t.recaptcha);
 	}
 
 	try {
@@ -45,10 +50,10 @@ export async function handleContact(request: Request): Promise<Response> {
 	} catch (e) {
 		const code = (e as { code?: string }).code ?? "unknown";
 		console.error("send failed", code, (e as Error).message);
-		return error("Je bericht is niet verstuurd. Probeer het later opnieuw.", 502);
+		return error(t.failed, 502);
 	}
 
-	return redirect(url, "/verzonden/");
+	return redirect(url, sent);
 }
 
 // reCAPTCHA score check with siteverify and the score key's secret. The token
