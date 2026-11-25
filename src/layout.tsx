@@ -1,21 +1,38 @@
 import { env } from "cloudflare:workers";
 import { raw } from "hono/html";
 import type { Child } from "hono/jsx";
-import { pages } from "./blocks.ts";
+import { href, langOf, pages, pageAt, pagesIn, translation, type PageName } from "./blocks.ts";
+import { langAt, languages, messages, prefix, type Lang } from "./languages.ts";
 
 // The shared page shell: fonts, the Tailwind stylesheet (src/styles/app.css),
 // and the navbar with the pages from blocks.ts, the current one marked active.
+// `url` is the request's: the page and language follow from its path.
 // `form` loads reCAPTCHA and form.js, only on pages that show the contact form.
-export function Layout(props: { title?: string; path?: string; form?: boolean; children: Child }) {
+export function Layout(props: { title?: string; url: string; form?: boolean; children: Child }) {
 	const title = props.title ? `${props.title} - ${env.SITE_NAME}` : env.SITE_NAME;
+	const url = new URL(props.url);
+	const page = pageAt(url.pathname);
+	const lang = page ? langOf(page) : langAt(url.pathname);
+	const t = messages[lang];
+	// hreflang links to this page in each language that has it.
+	const alternates = page
+		? languages.flatMap((l) => {
+				const other = translation(page, l);
+				return other ? [{ lang: l, page: other }] : [];
+			})
+		: [];
 	return (
 		<>
 			{raw("<!doctype html>")}
-			<html lang="nl">
+			<html lang={lang}>
 				<head>
 					<meta charset="utf-8" />
 					<meta name="viewport" content="width=device-width, initial-scale=1" />
 					<title>{title}</title>
+					{alternates.length > 1 &&
+						alternates.map((a) => (
+							<link rel="alternate" hreflang={a.lang} href={new URL(href(a.page), url).href} />
+						))}
 					<link rel="preconnect" href="https://fonts.googleapis.com" />
 					<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
 					<link
@@ -42,11 +59,11 @@ export function Layout(props: { title?: string; path?: string; form?: boolean; c
 				</head>
 				<body>
 					<a class="sr-only bg-white p-2 focus:not-sr-only focus:absolute focus:z-50" href="#main">
-						Naar de inhoud
+						{t.skip}
 					</a>
-					<Navbar path={props.path} />
+					<Navbar page={page} lang={lang} />
 					<main id="main">{props.children}</main>
-					<Lightbox />
+					<Lightbox lang={lang} />
 				</body>
 			</html>
 		</>
@@ -66,8 +83,16 @@ const drawer = {
 
 // The navbar of the Elloro emdash-boilerplate: Alpine opens the menu as a
 // drawer below the xl breakpoint (navbar.js), and shows it inline from xl up.
-function Navbar(props: { path?: string }) {
-	const links = Object.values(pages);
+// Other languages show as a switch to the same page, or that language's home.
+function Navbar(props: { page?: PageName; lang: Lang }) {
+	const links = pagesIn(props.lang);
+	const t = messages[props.lang];
+	const switches = languages
+		.filter((l) => l !== props.lang)
+		.map((l) => {
+			const other = props.page && translation(props.page, l);
+			return { lang: l, href: other ? href(other) : `${prefix(l)}/` };
+		});
 	return (
 		<nav
 			id="navbar"
@@ -76,7 +101,7 @@ function Navbar(props: { path?: string }) {
 			class="sticky top-0 z-30 w-full bg-white py-2 shadow-sm"
 		>
 			<div class="container flex items-center gap-1">
-				<a class="mr-auto block py-[0.4375rem]" href="/">
+				<a class="mr-auto block py-[0.4375rem]" href={`${prefix(props.lang)}/`}>
 					<span class="logo"></span>
 					<span class="sr-only">{env.SITE_NAME}</span>
 				</a>
@@ -85,7 +110,7 @@ function Navbar(props: { path?: string }) {
 					type="button"
 					{...{ "@click": "menu = true", ":aria-expanded": "menu" }}
 					aria-controls="navbarMenu"
-					aria-label="Menu"
+					aria-label={t.menu}
 				>
 					<svg class="size-[1em] fill-current" aria-hidden="true" viewBox="0 0 448 512">
 						<path d="M0 88C0 74.7 10.7 64 24 64l400 0c13.3 0 24 10.7 24 24s-10.7 24-24 24L24 112C10.7 112 0 101.3 0 88zM0 248c0-13.3 10.7-24 24-24l400 0c13.3 0 24 10.7 24 24s-10.7 24-24 24L24 272c-13.3 0-24-10.7-24-24zM448 408c0 13.3-10.7 24-24 24L24 432c-13.3 0-24-10.7-24-24s10.7-24 24-24l400 0c13.3 0 24 10.7 24 24z" />
@@ -109,7 +134,7 @@ function Navbar(props: { path?: string }) {
 							type="button"
 							class="btn btn-navbar btn-square"
 							{...{ "@click": "menu = false" }}
-							aria-label="Sluiten"
+							aria-label={t.close}
 						>
 							<svg class="size-[1em] fill-current" aria-hidden="true" viewBox="0 0 384 512">
 								<path d="M7.5 105c-9.4-9.4-9.4-24.6 0-33.9s24.6-9.4 33.9 0l151 151 151-151c9.4-9.4 24.6-9.4 33.9 0s9.4 24.6 0 33.9l-151 151 151 151c9.4 9.4 9.4 24.6 0 33.9s-24.6 9.4-33.9 0l-151-151-151 151c-9.4 9.4-24.6 9.4-33.9 0s-9.4-24.6 0-33.9l151-151-151-151z" />
@@ -119,13 +144,20 @@ function Navbar(props: { path?: string }) {
 					<div class="flex-1 overflow-y-auto px-8 pb-4 xl:flex xl:items-center xl:justify-end xl:overflow-visible xl:p-0">
 						<ul class="flex flex-col xl:flex-row xl:flex-wrap xl:items-center xl:justify-end">
 							{links.map((page, i) => (
-								<li class={i < links.length - 1 ? "xl:mr-8" : undefined}>
+								<li class={i < links.length - 1 || switches.length ? "xl:mr-8" : undefined}>
 									<a
-										class={page.path === props.path ? "nav-link active" : "nav-link"}
-										href={page.path}
-										aria-current={page.path === props.path ? "page" : undefined}
+										class={page === props.page ? "nav-link active" : "nav-link"}
+										href={href(page)}
+										aria-current={page === props.page ? "page" : undefined}
 									>
-										{page.title}
+										{pages[page].title}
+									</a>
+								</li>
+							))}
+							{switches.map((s, i) => (
+								<li class={i < switches.length - 1 ? "xl:mr-8" : undefined}>
+									<a class="nav-link" href={s.href} hreflang={s.lang} lang={s.lang}>
+										{s.lang.toUpperCase()}
 									</a>
 								</li>
 							))}
@@ -139,26 +171,27 @@ function Navbar(props: { path?: string }) {
 
 // The large view of a gallery image (public/gallery.js). Arrow keys and the
 // buttons step through the gallery; Escape or a click outside closes it.
-function Lightbox() {
+function Lightbox(props: { lang: Lang }) {
+	const t = messages[props.lang];
 	const button =
 		"btn btn-square absolute top-1/2 -translate-y-1/2 bg-white/90 text-body hover:bg-white";
 	return (
 		<dialog
 			id="lightbox"
-			aria-label="Afbeelding"
+			aria-label={t.image}
 			class="m-auto max-h-none max-w-none bg-transparent p-0 backdrop:bg-black/85"
 		>
 			<img class="max-h-[90dvh] max-w-[92vw] rounded-md object-contain" alt="" />
-			<button type="button" data-step="-1" class={`${button} left-2`} aria-label="Vorige">
+			<button type="button" data-step="-1" class={`${button} left-2`} aria-label={t.previous}>
 				‹
 			</button>
-			<button type="button" data-step="1" class={`${button} right-2`} aria-label="Volgende">
+			<button type="button" data-step="1" class={`${button} right-2`} aria-label={t.next}>
 				›
 			</button>
 			<form method="dialog">
 				<button
 					class="btn btn-square absolute top-2 right-2 bg-white/90 text-body hover:bg-white"
-					aria-label="Sluiten"
+					aria-label={t.close}
 				>
 					×
 				</button>
@@ -167,13 +200,16 @@ function Lightbox() {
 	);
 }
 
-// Keep the field names: handleContact in contact.ts reads them.
-export function ContactForm() {
+// Keep the field names: handleContact in contact.ts reads them, `lang` for
+// its messages and the thank-you page.
+export function ContactForm(props: { lang?: Lang }) {
+	const lang = props.lang ?? languages[0];
+	const t = messages[lang].form;
 	return (
 		<form method="post" action="/api/contact" class="grid gap-4">
 			<div>
 				<label class="form-label" for="name">
-					Naam
+					{t.name}
 				</label>
 				<input
 					class="form-input"
@@ -186,7 +222,7 @@ export function ContactForm() {
 			</div>
 			<div>
 				<label class="form-label" for="email">
-					E-mail
+					{t.email}
 				</label>
 				<input
 					class="form-input"
@@ -200,7 +236,7 @@ export function ContactForm() {
 			</div>
 			<div>
 				<label class="form-label" for="message">
-					Bericht
+					{t.message}
 				</label>
 				<textarea
 					class="form-input"
@@ -214,10 +250,11 @@ export function ContactForm() {
 			<label class="hp" aria-hidden="true">
 				Website <input name="website" tabindex={-1} autocomplete="off" />
 			</label>
+			<input type="hidden" name="lang" value={lang} />
 			<input type="hidden" name="recaptcha_token" />
 			<div>
 				<button class="btn btn-primary" type="submit">
-					Versturen
+					{t.send}
 				</button>
 			</div>
 		</form>

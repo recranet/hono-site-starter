@@ -26,9 +26,30 @@ pnpm --dir example-nl install
 cp example-nl/.dev.vars.example example-nl/.dev.vars
 ```
 
-Note the starter commit (`git ls-remote https://github.com/recranet/hono-site-starter.git master`) in the site's first commit message. Fill in the placeholders in `package.json` and `cloudflare.config.ts`, the pages in `src/index.tsx`, the editable texts and navbar in `src/blocks.ts`, the brand colours and fonts in `src/styles/app.css` and the logo in `public/img/logo.svg`. Put the reCAPTCHA score key's secret in `.dev.vars` as `RECAPTCHA_SECRET`.
+Note the starter commit (`git ls-remote https://github.com/recranet/hono-site-starter.git master`) in the site's first commit message. Fill in the placeholders in `package.json` and `cloudflare.config.ts`, the pages in `src/index.tsx`, the editable texts and navbar in `src/blocks.ts` (and its languages in `src/languages.ts`), the brand colours and fonts in `src/styles/app.css` and the logo in `public/img/logo.svg`. Put the reCAPTCHA score key's secret in `.dev.vars` as `RECAPTCHA_SECRET`.
 
 `pnpm check` must pass without warnings. `pnpm dev` serves the site locally.
+
+## More languages (optional)
+
+A site is Dutch, with its pages at the root. To add English:
+
+1. Set `languages` in `src/languages.ts` to `["nl", "en"]`. Every page moves under its language (`/nl/over-ons/`, `/en/`), and `/` redirects to `/nl/`. The old root paths of a live site stop working.
+2. Add the English pages to `src/blocks.ts`, each with `lang: "en"`, a key of its own and `translates` naming the Dutch page. The navbar shows the pages of the current language and a switch to the same page in the other one (or its home); the head gets `hreflang` links.
+
+   ```ts
+   "en-contact": {
+   	title: "Contact",
+   	lang: "en",
+   	translates: "contact",
+   	path: "/contact/",
+   	blocks: { intro: { label: "Introductie", text: "Get in touch." } },
+   },
+   ```
+
+3. Add a route per page in `src/index.tsx` with `app.get(href("en-contact"), …)`, like the Dutch ones. A contact page passes its language: `<ContactForm lang="en" />`.
+
+The form, its errors, the thank-you page (`/en/sent/`) and the 404 take their texts from `messages` in `src/languages.ts`; another language needs an entry there first. The admin stays Dutch and lists the pages by language ("Contact (EN)").
 
 ## Editing (optional)
 
