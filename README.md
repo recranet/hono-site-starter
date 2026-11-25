@@ -75,6 +75,12 @@ For images and galleries in the texts, create an R2 bucket and put its name in `
 cf r2 buckets create --name example-nl-media
 ```
 
+## Text styles
+
+Besides bold, italic, headings, quotes, lists and links, the editor offers the site's own text styles: paragraph styles (a lead paragraph), styles for selected words (a highlight) and link styles (a button). They are all in `src/text-styles.ts`, one entry each with its toolbar label and the element and classes it renders as. The starter ships one example of each, shown in home's "Over deze site" text.
+
+A site adds or removes entries there and puts their CSS in `src/styles/app.css` (or uses Tailwind classes). The admin loads the site's stylesheet, so the editor shows them as the page does. Removing a style that saved texts use is safe: those parts show as normal text, and the next save drops the style.
+
 ## Deploy
 
 ```bash
