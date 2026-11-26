@@ -27,7 +27,10 @@
 	--color-body: #212529;
 	--color-muted: #6c757d;
 	--color-border: #dee2e6;
+	--color-success: #198754;
 	--color-danger: #dc3545;
+	--color-warning: #ffc107;
+	--color-info: #0dcaf0;
 
 	/* Fonts */
 	--font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
@@ -45,6 +48,8 @@
 	--text-h4: min(1.875rem, calc(1.3125rem + 0.75vw));
 	--text-h5: min(1.5rem, calc(1.275rem + 0.3vw));
 	--text-h6: 1.25rem;
+	/* The hero title from xl up */
+	--text-display: min(4.5rem, calc(1.575rem + 3.9vw));
 
 	/* Breakpoints */
 	--breakpoint-sm: 36rem;
@@ -53,11 +58,25 @@
 	--breakpoint-xl: 75rem;
 	--breakpoint-2xl: 87.5rem;
 
-	/* Vertical rhythm of page sections */
+	/* Card padding and the gaps in the footer: 1.5rem, a little less on small screens */
+	--spacing-flow: min(1.5rem, calc(1.275rem + 0.3vw));
+
+	/* Vertical rhythm of page sections; half of it below a section's header */
 	--spacing-section: min(5rem, calc(1.625rem + 4.5vw));
+	--spacing-section-half: min(2.5rem, calc(1.375rem + 1.5vw));
 
 	--shadow-sm: 0 1px 2px rgb(0 0 0 / 0.04), 0 2px 8px rgb(0 0 0 / 0.04);
 	--shadow-md: 0 2px 4px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.06);
+	--shadow-lg: 0 4px 8px rgb(0 0 0 / 0.04), 0 16px 48px rgb(0 0 0 / 0.08);
+
+	/* Marquee in src/components.tsx: two copies of the line move left by one copy's width */
+	--animate-marquee: marquee var(--marquee-duration, 30s) linear infinite;
+
+	@keyframes marquee {
+		to {
+			transform: translateX(-50%);
+		}
+	}
 }
 
 /* ---------- base ---------- */
@@ -120,7 +139,16 @@
 		}
 	}
 
-	/* Page sections: vertical rhythm, alternating white and light backgrounds */
+	small {
+		font-size: 0.875em;
+	}
+
+	::marker {
+		color: var(--color-primary-light);
+	}
+
+	/* Page sections: vertical rhythm, alternating white and light backgrounds. In the base layer, so a section can
+	   override either with a utility (the CTA's colour, the cover hero's padding). */
 	main > section {
 		padding-block: var(--spacing-section);
 
@@ -131,6 +159,70 @@
 }
 
 /* ---------- utilities ---------- */
+
+/* Heading styles for non-heading elements, or another size on a heading (add the margin yourself) */
+@utility heading-1 {
+	font-weight: 700;
+	font-size: var(--text-h1);
+	line-height: 1.2;
+	font-family: var(--font-heading);
+}
+@utility heading-2 {
+	font-weight: 700;
+	font-size: var(--text-h2);
+	line-height: 1.2;
+	font-family: var(--font-heading);
+}
+@utility heading-3 {
+	font-weight: 700;
+	font-size: var(--text-h3);
+	line-height: 1.2;
+	font-family: var(--font-heading);
+}
+@utility heading-4 {
+	font-weight: 700;
+	font-size: var(--text-h4);
+	line-height: 1.2;
+	font-family: var(--font-heading);
+}
+@utility heading-5 {
+	font-weight: 700;
+	font-size: var(--text-h5);
+	line-height: 1.2;
+	font-family: var(--font-heading);
+}
+
+/* Makes a whole card clickable: the link's ::after covers its positioned parent */
+@utility stretched-link {
+	&::after {
+		position: absolute;
+		z-index: 1;
+		inset: 0;
+		content: "";
+	}
+}
+
+/* Darkening gradient over the cover hero image, strongest in the middle where the text sits */
+@utility hero-shade {
+	background: linear-gradient(
+		to bottom,
+		rgb(0 0 0 / 0.25) 0%,
+		rgb(0 0 0 / 0.4) 25%,
+		rgb(0 0 0 / 0.5) 50%,
+		rgb(0 0 0 / 0.4) 75%,
+		rgb(0 0 0 / 0.25) 100%
+	);
+}
+
+/* Small label. Add the radius, weight and colours: `badge rounded-md font-bold bg-light` */
+@utility badge {
+	display: inline-block;
+	padding: 0.35em 0.65em;
+	font-size: 0.75em;
+	line-height: 1;
+	text-align: center;
+	white-space: nowrap;
+}
 
 /* Container widths: 540 / 720 / 960 / 1140 / 1320px, 0.75rem side padding */
 @utility container {
@@ -198,7 +290,23 @@
 		pointer-events: none;
 	}
 }
-/* Square icon button, 48px */
+/* Small button, 32px */
+@utility btn-sm {
+	--btn-size: 2rem;
+	--btn-py: 0.25rem;
+	--btn-px: 0.5rem;
+	--btn-radius: 0.25rem;
+	--btn-font-size: 0.875rem;
+}
+/* Round icon button, 48px (32px with btn-sm) */
+@utility btn-circle {
+	--btn-py: 0;
+	--btn-px: 0;
+	--btn-radius: 9999px;
+	--btn-width: var(--btn-size, 3rem);
+	--btn-height: var(--btn-size, 3rem);
+}
+/* Square icon button, 48px (32px with btn-sm) */
 @utility btn-square {
 	--btn-py: 0;
 	--btn-px: 0;
@@ -218,6 +326,34 @@
 	--btn-hover-bg: var(--color-primary);
 	--btn-hover-color: var(--color-white);
 }
+/* White buttons on a coloured panel or an image (CTA, cover hero) */
+@utility btn-white {
+	--btn-border: var(--color-white);
+	--btn-bg: var(--color-white);
+	--btn-color: var(--color-dark);
+	--btn-hover-border: var(--color-light);
+	--btn-hover-bg: var(--color-light);
+}
+@utility btn-outline-white {
+	--btn-border: var(--color-white);
+	--btn-color: var(--color-white);
+	--btn-hover-bg: var(--color-white);
+	--btn-hover-color: var(--color-dark);
+}
+@utility btn-light {
+	--btn-border: var(--color-light);
+	--btn-bg: var(--color-light);
+	--btn-color: var(--color-dark);
+	--btn-hover-border: #d3d4d5;
+	--btn-hover-bg: #d3d4d5;
+}
+/* Translucent button over images */
+@utility btn-overlay {
+	--btn-border-width: 0;
+	--btn-bg: rgb(0 0 0 / 0.25);
+	--btn-color: var(--color-white);
+	--btn-hover-bg: rgb(0 0 0 / 0.5);
+}
 /* Grey button in the navbar (menu toggle, submenu toggles) */
 @utility btn-navbar {
 	--btn-border: rgb(0 0 0 / 0.1);
@@ -230,6 +366,72 @@
 /* ---------- components ---------- */
 
 @layer components {
+	/*
+	 * A column of text and parts (Feature, the Onderdelen page): spaces out the direct children and styles the
+	 * lists, tables and quotes that texts produce. `article-sm` uses tighter spacing.
+	 */
+	.article,
+	.article-sm {
+		/* 2rem and 2.5rem, a little less on small screens */
+		--article-gap: min(2rem, calc(1.325rem + 0.9vw));
+		--article-block-gap: min(2.5rem, calc(1.375rem + 1.5vw));
+
+		& > :is(p, ul, ol, dl, figure, form) {
+			margin-bottom: var(--article-gap);
+		}
+		& > :is(form, blockquote, div, figure) {
+			margin-block: var(--article-block-gap);
+		}
+		& > :is(h2, h3, h4, h5, h6) {
+			margin-bottom: var(--article-gap);
+		}
+		& > :is(p, ul, ol, dl, figure, form, div) + :is(h2, h3, h4, h5, h6),
+		& > :is(h2, h3, h4, h5, h6) + :is(form, div, figure, h2, h3, h4, h5, h6) {
+			margin-top: var(--article-gap);
+		}
+		& > :first-child {
+			margin-top: 0;
+		}
+		& > :last-child {
+			margin-bottom: 0;
+		}
+
+		/* Lists from texts (parts style their own lists with utilities, so they carry a class) */
+		& :is(ul, ol):not([class]) {
+			padding-left: 2rem;
+		}
+		& ul:not([class]) {
+			list-style: disc;
+		}
+		& ol:not([class]) {
+			list-style: decimal;
+		}
+
+		& table {
+			display: block;
+			border: 1px solid var(--color-border);
+			border-collapse: collapse;
+			width: 100%;
+			overflow-x: auto;
+		}
+		& :is(th, td) {
+			vertical-align: top;
+			border: 1px solid var(--color-border);
+			padding: 0.5rem;
+		}
+		& th {
+			font-weight: 700;
+		}
+
+		& blockquote {
+			font-size: 1.25rem;
+		}
+	}
+	.article-sm {
+		--article-gap: 1rem;
+		--article-block-gap: min(2rem, calc(1.325rem + 0.9vw));
+	}
+
 	/* Contact form fields, styled like the boilerplate's forms plugin (.ec-form-*) */
 	.form-label {
 		display: inline-block;

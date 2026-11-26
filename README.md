@@ -81,6 +81,10 @@ Besides bold, italic, headings, quotes, lists and links, the editor offers the s
 
 A site adds or removes entries there and puts their CSS in `src/styles/app.css` (or uses Tailwind classes). The admin loads the site's stylesheet, so the editor shows them as the page does. Removing a style that saved texts use is safe: those parts show as normal text, and the next save drops the style.
 
+## Page parts
+
+`src/components.tsx` has the sections of the Elloro emdash-boilerplate as Hono JSX, without JS libraries: Hero (cover or split), Cards (grid or bento; default, overlay and text cards), Feature (text beside an image), Features (grid or list), Stats, CTA, Accordion (`<details>`), Checklist, Quote, Labels, GoogleMap, Marquee and the Footer the layout shows. Content goes in as props; pass prose as `text("…")` so the customer can edit it. The Onderdelen page (`/onderdelen/`) shows each once. A site uses what fits on its own pages, then deletes that page (its route in `src/index.tsx`, its entry in `src/blocks.ts`), `public/img/placeholder.svg` and the parts it doesn't use.
+
 ## Deploy
 
 ```bash

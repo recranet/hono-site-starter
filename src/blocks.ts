@@ -95,6 +95,23 @@ export const pages = {
 			body: { label: "Tekst", text: "Vertel hier wie je bent en wat je doet." },
 		},
 	},
+	// The page parts in components.tsx, each once. A site deletes this page.
+	onderdelen: {
+		title: "Onderdelen",
+		lang: "nl",
+		path: "/onderdelen/",
+		blocks: {
+			intro: {
+				label: "Introductie",
+				text: "De onderdelen uit src/components.tsx. Gebruik op een pagina wat past en verwijder deze pagina.",
+			},
+			feature: {
+				label: "Tekst naast afbeelding",
+				text: "Een tekst naast een afbeelding, links of rechts. De klant past de tekst aan; de afbeelding staat in de code.\n\nDe kolom heeft de class article: alinea's, lijsten en citaten krijgen ruimte.",
+			},
+			cta: { label: "Oproep", text: "Een vlak in de merkkleur met knoppen." },
+		},
+	},
 	contact: {
 		title: "Contact",
 		lang: "nl",
