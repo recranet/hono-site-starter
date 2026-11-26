@@ -1,11 +1,14 @@
 import { env } from "cloudflare:workers";
+import { uriLooksSafe } from "@portabletext/to-html";
 import type { Child } from "hono/jsx";
+import type { HtmlEscapedString } from "hono/utils/html";
 import { srcset } from "./media.ts";
+import { IMAGE_SRC } from "./parts.ts";
 
 // Page parts from the Elloro emdash-boilerplate (src/components there), as Hono
-// JSX for the pages in index.tsx. They need no JS library: no Swiper, Fancybox
-// or GSAP. Structured content (cards, figures, items) is passed in code; pass
-// prose as `text("name")` from blocks.ts so the customer can edit it.
+// JSX. They need no JS library: no Swiper, Fancybox or GSAP. The customer
+// inserts them in the editor (parts.ts); renderPart below turns a saved part
+// into HTML. Page code can use them directly too.
 // The "Onderdelen" page shows each one. Delete what a site doesn't use.
 
 // An image from public/ (/img/…) or the editor's uploads (/media/…). Give
@@ -32,17 +35,14 @@ function Image(props: Img & { class?: string; sizes?: string; eager?: boolean })
 	);
 }
 
-// A row of buttons. `onDark` gives the white variants for coloured panels.
-export function Buttons(props: { buttons?: Button[]; onDark?: boolean; class?: string }) {
+// A row of buttons. `on="dark"` gives the white variants for coloured panels;
+// `on="image"` keeps the filled button and makes the outline one white.
+export function Buttons(props: { buttons?: Button[]; on?: "dark" | "image"; class?: string }) {
 	if (!props.buttons?.length) return null;
-	const style = (b: Button) =>
-		props.onDark
-			? b.style === "outline"
-				? "btn-outline-white"
-				: "btn-white"
-			: b.style === "outline"
-				? "btn-outline-primary"
-				: "btn-primary";
+	const style = (b: Button) => {
+		if (b.style === "outline") return props.on ? "btn-outline-white" : "btn-outline-primary";
+		return props.on === "dark" ? "btn-white" : "btn-primary";
+	};
 	return (
 		<div class={props.class ?? "flex flex-wrap gap-2"}>
 			{props.buttons.map((b) => (
@@ -85,7 +85,7 @@ export function Hero(props: {
 	intro?: Child;
 	image?: Img;
 	variant?: "cover" | "split";
-	button?: Button;
+	buttons?: Button[];
 }) {
 	const body = (onImage: boolean) => (
 		<div class="relative z-1 py-[min(60px,calc(24px+3vw))]">
@@ -93,13 +93,11 @@ export function Hero(props: {
 			{props.intro && (
 				<div class="text-xl [&_a]:text-inherit [&_p:last-child]:mb-0">{props.intro}</div>
 			)}
-			{props.button && (
-				<Buttons
-					buttons={[props.button]}
-					onDark={onImage && props.button.style === "outline"}
-					class="mt-4"
-				/>
-			)}
+			<Buttons
+				buttons={props.buttons}
+				on={onImage ? "image" : undefined}
+				class="mt-4 flex flex-wrap gap-2"
+			/>
 		</div>
 	);
 	if (props.image && props.variant === "split") {
@@ -370,7 +368,7 @@ export function Cta(props: { title?: string; image?: Img; buttons?: Button[]; ch
 					{props.title && <h2 class="not-last:mb-5">{props.title}</h2>}
 					{props.children}
 				</header>
-				<Buttons buttons={props.buttons} onDark class="flex flex-wrap justify-center gap-2" />
+				<Buttons buttons={props.buttons} on="dark" class="flex flex-wrap justify-center gap-2" />
 			</div>
 		</section>
 	);
@@ -542,4 +540,152 @@ export function Footer(props: { home: string; links: { title: string; href: stri
 			</div>
 		</footer>
 	);
+}
+
+// A saved part (parts.ts) as HTML. blocks.ts checked its fields when it was
+// saved; links and image paths are checked again here before they go out.
+// The components are synchronous, so the element is already a string.
+export function renderPart(value: Record<string, unknown>): string {
+	const node = partNode(value);
+	return node ? (node as HtmlEscapedString).toString() : "";
+}
+
+const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+const rows = (v: unknown) =>
+	(Array.isArray(v) ? v : []).filter(
+		(row): row is Record<string, unknown> => typeof row === "object" && row !== null,
+	);
+const href = (v: unknown) => (uriLooksSafe(str(v)) ? str(v) : "");
+function img(v: unknown): Img | undefined {
+	if (typeof v !== "object" || v === null) return undefined;
+	const image = v as Record<string, unknown>;
+	if (!IMAGE_SRC.test(str(image.src))) return undefined;
+	const size = (n: unknown) => (typeof n === "number" && n > 0 ? n : undefined);
+	return {
+		src: str(image.src),
+		alt: str(image.alt),
+		width: size(image.width),
+		height: size(image.height),
+	};
+}
+function buttons(v: unknown): Button[] {
+	return rows(v)
+		.map((b) => ({
+			label: str(b.label),
+			href: href(b.href),
+			style: b.style === "outline" ? ("outline" as const) : ("default" as const),
+		}))
+		.filter((b) => b.label && b.href);
+}
+
+// A plain text field: a blank line starts a new paragraph, a single line break stays.
+function paragraphs(v: unknown) {
+	const text = str(v);
+	if (!text) return undefined;
+	return text.split(/\n\s*\n/).map((p) => <p class="whitespace-pre-line">{p.trim()}</p>);
+}
+
+function partNode(v: Record<string, unknown>) {
+	const title = str(v.title) || undefined;
+	const intro = paragraphs(v.intro);
+	switch (v._type) {
+		case "hero":
+			return (
+				<Hero
+					title={str(v.title)}
+					intro={intro}
+					image={img(v.image)}
+					variant={v.variant === "split" ? "split" : "cover"}
+					buttons={buttons(v.buttons)}
+				/>
+			);
+		case "feature": {
+			const image = img(v.image);
+			if (!image) return null;
+			return (
+				<Feature
+					title={title}
+					headline={str(v.headline) || undefined}
+					image={{ ...image, caption: str(v.caption) || undefined }}
+					align={v.align === "right" ? "right" : "left"}
+					buttons={buttons(v.buttons)}
+				>
+					{paragraphs(v.text)}
+				</Feature>
+			);
+		}
+		case "cards":
+			return (
+				<Cards
+					title={title}
+					intro={intro}
+					layout={v.layout === "bento" ? "bento" : "grid"}
+					cards={rows(v.cards).map((c) => ({
+						title: str(c.title),
+						text: str(c.text) || undefined,
+						href: href(c.href) || undefined,
+						image: img(c.image),
+						style: c.style === "overlay" || c.style === "text" ? c.style : "default",
+					}))}
+				/>
+			);
+		case "features":
+			return (
+				<Features
+					title={title}
+					intro={intro}
+					layout={v.layout === "list" ? "list" : "grid"}
+					items={rows(v.items).map((i) => ({
+						title: str(i.title),
+						text: str(i.text) || undefined,
+						image: img(i.image),
+					}))}
+				/>
+			);
+		case "stats":
+			return (
+				<Stats
+					title={title}
+					intro={intro}
+					items={rows(v.items).map((i) => ({ value: str(i.value), label: str(i.label) }))}
+				/>
+			);
+		case "cta":
+			return (
+				<Cta title={title} image={img(v.image)} buttons={buttons(v.buttons)}>
+					{paragraphs(v.text)}
+				</Cta>
+			);
+		case "marquee":
+			return (
+				<Marquee
+					items={rows(v.items).map((i) => str(i.text))}
+					speed={v.speed === "slow" || v.speed === "fast" ? v.speed : "normal"}
+				/>
+			);
+		case "map":
+			return str(v.query) ? <GoogleMap title={title} intro={intro} query={str(v.query)} /> : null;
+		case "accordion":
+			return (
+				<Accordion
+					name={`accordion-${str(v._key)}`}
+					items={rows(v.items).map((i) => ({ title: str(i.title), text: paragraphs(i.text) }))}
+				/>
+			);
+		case "quote":
+			return <Quote source={str(v.source) || undefined}>{paragraphs(v.text)}</Quote>;
+		case "checklist":
+			return (
+				<Checklist
+					items={rows(v.items).map((i) => ({
+						label: str(i.label),
+						text: str(i.text) || undefined,
+					}))}
+				/>
+			);
+		case "labels":
+			return <Labels items={rows(v.items).map((i) => str(i.text))} />;
+		default:
+			return null;
+	}
 }

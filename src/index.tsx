@@ -2,20 +2,6 @@ import { Hono } from "hono";
 import { appendTrailingSlash } from "hono/trailing-slash";
 import { admin } from "./admin/index.tsx";
 import { blocks, href } from "./blocks.ts";
-import {
-	Accordion,
-	Cards,
-	Checklist,
-	Cta,
-	Feature,
-	Features,
-	GoogleMap,
-	Hero,
-	Labels,
-	Marquee,
-	Quote,
-	Stats,
-} from "./components.tsx";
 import { handleContact } from "./contact.ts";
 import { langAt, languages, messages, prefix } from "./languages.ts";
 import { ContactForm, Layout } from "./layout.tsx";
@@ -31,172 +17,42 @@ app.use(appendTrailingSlash());
 // More than one language: / goes to the first language's home (languages.ts).
 if (languages.length > 1) app.get("/", (c) => c.redirect(`${prefix(languages[0])}/`));
 
-// A page with editable text loads its blocks first (blocks.ts). href() gives
+// A page loads its texts first (blocks.ts) and renders its `body` as sections:
+// the parts the customer inserted and the text between them. href() gives
 // its path, with the language prefix on a site with more than one.
 app.get(href("home"), async (c) => {
 	const text = await blocks("home");
-	return c.html(
-		<Layout url={c.req.url}>
-			<Hero
-				title="Welkom"
-				intro={text("intro")}
-				button={{ label: "Neem contact op", href: href("contact") }}
-			/>
-			<section>
-				<div class="container">
-					<h2>Over deze site</h2>
-					{text("about")}
-					<a class="btn btn-outline-primary" href={href("over-ons")}>
-						Lees meer
-					</a>
-				</div>
-			</section>
-		</Layout>,
-	);
+	return c.html(<Layout url={c.req.url}>{text.page("body")}</Layout>);
 });
 
 app.get(href("over-ons"), async (c) => {
 	const text = await blocks("over-ons");
 	return c.html(
 		<Layout title="Over ons" url={c.req.url}>
-			<section>
-				<div class="container">
-					<div class="max-w-2xl">
-						<h1>Over ons</h1>
-						<div class="text-lg">{text("intro")}</div>
-						{text("body")}
-					</div>
-				</div>
-			</section>
+			{text.page("body")}
 		</Layout>,
 	);
 });
 
-// Every part in components.tsx once, with placeholder content. A site deletes
-// this route and the page in blocks.ts.
+// Every part once (blocks.ts). A site deletes this route and the page.
 app.get(href("onderdelen"), async (c) => {
 	const text = await blocks("onderdelen");
-	const image = { src: "/img/placeholder.svg", alt: "", width: 1600, height: 1200 };
 	return c.html(
 		<Layout title="Onderdelen" url={c.req.url}>
-			<Hero
-				title="Onderdelen"
-				intro={text("intro")}
-				image={image}
-				button={{ label: "Neem contact op", href: href("contact") }}
-			/>
-			<Feature
-				title="Tekst naast afbeelding"
-				headline="Feature"
-				image={{ ...image, caption: "Een onderschrift" }}
-				buttons={[{ label: "Lees meer", href: href("over-ons"), style: "outline" }]}
-			>
-				{text("feature")}
-			</Feature>
-			<Cards
-				title="Kaarten"
-				intro="Drie stijlen: met afbeelding, tekst over de afbeelding en alleen tekst."
-				cards={[
-					{ title: "Kaart", text: "Afbeelding boven de tekst", href: "#", image },
-					{
-						title: "Overlay",
-						text: "Tekst over de afbeelding",
-						href: "#",
-						image,
-						style: "overlay",
-					},
-					{ title: "Tekst", text: "Alleen tekst, in de merkkleur", href: "#" },
-				]}
-			/>
-			<Cards
-				title="Bento"
-				layout="bento"
-				cards={[
-					{ title: "Breed", image, style: "overlay" },
-					{ title: "Smal", image, style: "overlay" },
-					{ title: "Smal" },
-					{ title: "Breed", image, style: "overlay" },
-				]}
-			/>
-			<Features
-				title="Kenmerken"
-				items={[
-					{ title: "Snel", text: "Pagina's komen van de Worker, dicht bij de bezoeker." },
-					{ title: "Bewerkbaar", text: "De klant past de teksten aan via /admin/." },
-					{ title: "Licht", text: "Geen JavaScript-bibliotheken nodig.", image },
-				]}
-			/>
-			<Features
-				title="Als lijst"
-				layout="list"
-				items={[
-					{ title: "Eerste punt", text: "Met het vinkje als er geen afbeelding is." },
-					{ title: "Tweede punt", text: "Of een ronde afbeelding.", image },
-				]}
-			/>
-			<Stats
-				title="Kerncijfers"
-				items={[
-					{ value: "25+", label: "jaar ervaring" },
-					{ value: "1.200", label: "klanten" },
-					{ value: "98%", label: "tevreden" },
-					{ value: "24/7", label: "bereikbaar" },
-				]}
-			/>
-			<Cta
-				title="Oproep"
-				buttons={[
-					{ label: "Neem contact op", href: href("contact") },
-					{ label: "Over ons", href: href("over-ons"), style: "outline" },
-				]}
-			>
-				{text("cta")}
-			</Cta>
-			<section>
-				<div class="container">
-					<div class="article max-w-2xl">
-						<h2>In een tekstkolom</h2>
-						<Accordion
-							name="faq"
-							items={[
-								{ title: "Opent één tegelijk?", text: "Ja, met <details name>, zonder script." },
-								{ title: "Kan het antwoord lang zijn?", text: "Ja.\nRegeleinden blijven staan." },
-							]}
-						/>
-						<Checklist
-							items={[
-								{ label: "Vinkjeslijst", text: "Met een regel uitleg" },
-								{ label: "Alleen een label" },
-							]}
-						/>
-						<Quote source="Een klant">Een citaat met de bron eronder.</Quote>
-						<Labels items={["Label", "Nog een label", "Derde"]} />
-					</div>
-				</div>
-			</section>
-			<Marquee
-				items={["Doorlopende tekst", "Pauzeert bij hover", "Staat stil bij reduced motion"]}
-			/>
-			<GoogleMap title="Kaart" query="Middelburg" height={360} />
-			<Hero
-				title="Hero naast afbeelding"
-				intro="De variant split: tekst naast de afbeelding."
-				image={image}
-				variant="split"
-			/>
+			{text.page("body")}
 		</Layout>,
 	);
 });
 
+// The form stays below the customer's text.
 app.get(href("contact"), async (c) => {
 	const text = await blocks("contact");
 	return c.html(
 		<Layout title="Contact" url={c.req.url} form>
+			{text.page("body")}
 			<section>
 				<div class="container">
 					<div class="max-w-2xl">
-						<h1>Contact</h1>
-						<div class="mb-8">{text("intro")}</div>
 						<ContactForm lang="nl" />
 					</div>
 				</div>

@@ -43,7 +43,7 @@ A site is Dutch, with its pages at the root. To add English:
    	lang: "en",
    	translates: "contact",
    	path: "/contact/",
-   	blocks: { intro: { label: "Introductie", text: "Get in touch." } },
+   	blocks: { body: { label: "Pagina", text: "Get in touch." } },
    },
    ```
 
@@ -77,13 +77,19 @@ cf r2 buckets create --name example-nl-media
 
 ## Text styles
 
-Besides bold, italic, headings, quotes, lists and links, the editor offers the site's own text styles: paragraph styles (a lead paragraph), styles for selected words (a highlight) and link styles (a button). They are all in `src/text-styles.ts`, one entry each with its toolbar label and the element and classes it renders as. The starter ships one example of each, shown in home's "Over deze site" text.
+Besides bold, italic, headings, quotes, lists and links, the editor offers the site's own text styles: paragraph styles (a lead paragraph), styles for selected words (a highlight) and link styles (a button). They are all in `src/text-styles.ts`, one entry each with its toolbar label and the element and classes it renders as. The starter ships one example of each, shown under "Over deze site" on home.
 
 A site adds or removes entries there and puts their CSS in `src/styles/app.css` (or uses Tailwind classes). The admin loads the site's stylesheet, so the editor shows them as the page does. Removing a style that saved texts use is safe: those parts show as normal text, and the next save drops the style.
 
 ## Page parts
 
-`src/components.tsx` has the sections of the Elloro emdash-boilerplate as Hono JSX, without JS libraries: Hero (cover or split), Cards (grid or bento; default, overlay and text cards), Feature (text beside an image), Features (grid or list), Stats, CTA, Accordion (`<details>`), Checklist, Quote, Labels, GoogleMap, Marquee and the Footer the layout shows. Content goes in as props; pass prose as `text("…")` so the customer can edit it. The Onderdelen page (`/onderdelen/`) shows each once. A site uses what fits on its own pages, then deletes that page (its route in `src/index.tsx`, its entry in `src/blocks.ts`), `public/img/placeholder.svg` and the parts it doesn't use.
+The customer builds each page in the editor. A page is one `body` text (`src/blocks.ts`); besides paragraphs, headings and images it holds page parts, which the editor's "Onderdeel" button inserts: Hero (cover or split), Feature (text beside an image), Cards (grid or bento), Features (grid or list), Stats, CTA, Marquee and Google Maps render full width; Accordion, Quote, Checklist and Labels sit in the text column with the paragraphs around them. Each part opens a form for its fields: plain texts (a blank line starts a paragraph), links, images from R2, choices and lists of items.
+
+- `src/parts.ts` defines the parts and their fields. The admin builds its forms from it, and saving checks a part against it.
+- `src/components.tsx` renders them, from the Elloro emdash-boilerplate's sections, as Hono JSX without JS libraries. Page code can use the components directly too, and the layout shows its Footer.
+- A route renders a page with `text.page("body")`: each full-width part as its own section, everything between them in a text column.
+
+The Onderdelen page (`/onderdelen/`) shows each part once. A site deletes it (its route in `src/index.tsx`, its entry in `src/blocks.ts`) and `public/img/placeholder.svg`. To drop a part, remove it from `src/parts.ts` and its case in `renderPart`; saved texts that use it leave it out.
 
 ## Deploy
 
