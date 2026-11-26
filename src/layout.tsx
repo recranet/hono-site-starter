@@ -2,10 +2,12 @@ import { env } from "cloudflare:workers";
 import { raw } from "hono/html";
 import type { Child } from "hono/jsx";
 import { href, langOf, pages, pageAt, pagesIn, translation, type PageName } from "./blocks.ts";
+import { Footer } from "./components.tsx";
 import { langAt, languages, messages, prefix, type Lang } from "./languages.ts";
 
 // The shared page shell: fonts, the Tailwind stylesheet (src/styles/app.css),
-// and the navbar with the pages from blocks.ts, the current one marked active.
+// the navbar with the pages from blocks.ts, the current one marked active, and
+// the footer (components.tsx).
 // `url` is the request's: the page and language follow from its path.
 // `form` loads reCAPTCHA and form.js, only on pages that show the contact form.
 export function Layout(props: { title?: string; url: string; form?: boolean; children: Child }) {
@@ -63,6 +65,10 @@ export function Layout(props: { title?: string; url: string; form?: boolean; chi
 					</a>
 					<Navbar page={page} lang={lang} />
 					<main id="main">{props.children}</main>
+					<Footer
+						home={`${prefix(lang)}/`}
+						links={pagesIn(lang).map((p) => ({ title: pages[p].title, href: href(p) }))}
+					/>
 					<Lightbox lang={lang} />
 				</body>
 			</html>

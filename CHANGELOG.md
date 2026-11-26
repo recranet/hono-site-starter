@@ -2,6 +2,10 @@
 
 Each change names the files it touches, so a site can diff just those (README, "Taking over fixes").
 
+## 2026-11-26
+
+- Page parts from the emdash-boilerplate in `src/components.tsx` (new), without JS libraries: Hero (cover or split, one image), Cards (grid or bento), Feature, Features (grid or list), Stats, CTA, Accordion (`<details name>`), Checklist, Quote, Labels, GoogleMap, Marquee and a Footer, which the layout now shows on every page. Home opens with the Hero. A demo page, Onderdelen (`/onderdelen/`), shows each part; a site deletes it. The stylesheet gains the classes they use: `heading-1`–`5`, `stretched-link`, `hero-shade`, `badge`, `article`/`article-sm`, `btn-sm`, `btn-circle`, `btn-white`, `btn-outline-white`, `btn-light`, `btn-overlay`, the success/warning/info colours, `text-display`, the `flow` and `section-half` spacing, `shadow-lg` and the marquee animation. `src/components.tsx` (new), `src/layout.tsx`, `src/index.tsx`, `src/blocks.ts`, `src/styles/app.css`, `public/img/placeholder.svg` (new), `README.md`.
+
 ## 2026-11-25
 
 - The admin's text switcher scrolls inside the window when a site has many texts, instead of running off the screen. `src/admin/admin.css`.
