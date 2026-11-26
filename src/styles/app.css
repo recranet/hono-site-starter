@@ -4,11 +4,12 @@
  * fonts (loaded in src/layout.tsx).
  *
  * `pnpm run css` compiles it to public/style.css (gitignored); build, dev and deploy run it first. Tailwind scans
- * the pages in src/ for classes. The admin loads this file before its own admin.css, for the text styles.
+ * the pages in src/ and the editor package for classes. The admin loads this file too, for the text styles.
  */
 @import "tailwindcss" source(none);
 @source '..';
-@source not '../admin';
+/* The editor's image, gallery and extension blocks (@recranet/worker-site-editor). */
+@source '../../node_modules/@recranet/worker-site-editor/dist';
 
 /* Alpine removes x-cloak once it has initialised. `cloak:hidden` keeps the closed menu hidden until then. */
 @custom-variant cloak (&[x-cloak]);

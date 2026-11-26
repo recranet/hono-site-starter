@@ -3,8 +3,8 @@ import { defineConfig } from "vite-plus";
 
 export default defineConfig({
 	plugins: [cloudflare()],
-	// The admin's browser files (src/admin/), built into the assets as
-	// /admin/style.css and /admin/admin.js. Public pages load neither.
+	// The admin's browser code (src/admin.ts), built into the assets as
+	// /admin/admin.js and /admin/style.css. Public pages load neither.
 	environments: {
 		client: {
 			build: {
@@ -15,11 +15,11 @@ export default defineConfig({
 					onwarn(warning, warn) {
 						if (warning.code !== "MODULE_LEVEL_DIRECTIVE") warn(warning);
 					},
-					input: { admin: "src/admin/admin.tsx", style: "src/admin/admin.css" },
+					input: { admin: "src/admin.ts" },
 					output: {
 						entryFileNames: "admin/[name].js",
 						chunkFileNames: "admin/[name]-[hash].js",
-						assetFileNames: "admin/[name][extname]",
+						assetFileNames: "admin/style[extname]",
 					},
 				},
 			},

@@ -12,3 +12,6 @@ allowBuilds:
   workerd: true
   # Only the Tailwind CLI's --watch uses it; the one-off build doesn't.
   "@parcel/watcher": false
+
+minimumReleaseAgeExclude:
+  - "@recranet/worker-site-editor@20261127.0.1"

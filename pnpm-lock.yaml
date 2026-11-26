@@ -18,12 +18,9 @@ importers:
       '@portabletext/editor':
         specifier: ^8.2.15
         version: 8.2.15(@types/react@19.3.0)(react@19.3.1)
-      '@portabletext/to-html':
-        specifier: ^6.0.0
-        version: 6.0.0
-      better-auth:
-        specifier: ^1.7.27
-        version: 1.7.27(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(vitest@5.0.5)
+      '@recranet/worker-site-editor':
+        specifier: 20261127.0.1
+        version: 20261127.0.1(@base-ui/react@1.9.0(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@portabletext/editor@8.2.15(@types/react@19.3.0)(react@19.3.1))(hono@4.13.21)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(vitest@5.0.5)
       hono:
         specifier: ^4.13.21
         version: 4.13.21
@@ -1057,6 +1054,16 @@ packages:
   '@portabletext/types@4.0.2':
     resolution: {integrity: sha512-djfIGU9n6DRrunlvj2nIDAp17URo/nA4jSXGvf+Gupx8NLLy9fmJBZ3GL8yhqn9lSVc+cKCharjOa3aOBnWbRw==}
     engines: {node: '>=20.19 <22 || >=22.12'}
+
+  '@recranet/worker-site-editor@20261127.0.1':
+    resolution: {integrity: sha512-62lJpGbr6df82z7Eil4pOgRWsG9bwDiK6MsqP/qKndVdC8bAuwPxfKaUHhNDVzBQ0ygct6WZWO+pw61RNvxfSg==}
+    engines: {node: ^26.12.0}
+    peerDependencies:
+      '@base-ui/react': ^1.9.0
+      '@portabletext/editor': ^8.2.15
+      hono: ^4.13.0
+      react: ^19.3.1
+      react-dom: ^19.3.1
 
   '@sanity/diff-match-patch@3.2.1':
     resolution: {integrity: sha512-Ll3BPOn9aPGeBUOFDZpKk0IObL+NI4tNq7VyOKj680xd+iCtfjnbcZZU0vpj94XozVGE0Zf+0FoYWXk2xJgZCg==}
@@ -2832,6 +2839,34 @@ snapshots:
       '@portabletext/types': 4.0.2
 
   '@portabletext/types@4.0.2': {}
+
+  '@recranet/worker-site-editor@20261127.0.1(@base-ui/react@1.9.0(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@portabletext/editor@8.2.15(@types/react@19.3.0)(react@19.3.1))(hono@4.13.21)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(vitest@5.0.5)':
+    dependencies:
+      '@base-ui/react': 1.9.0(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      '@portabletext/editor': 8.2.15(@types/react@19.3.0)(react@19.3.1)
+      '@portabletext/to-html': 6.0.0
+      better-auth: 1.7.27(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(vitest@5.0.5)
+      hono: 4.13.21
+      react: 19.3.1
+      react-dom: 19.3.1(react@19.3.1)
+    transitivePeerDependencies:
+      - '@lynx-js/react'
+      - '@opentelemetry/api'
+      - '@prisma/client'
+      - '@sveltejs/kit'
+      - '@tanstack/react-start'
+      - '@tanstack/solid-start'
+      - drizzle-kit
+      - drizzle-orm
+      - mongodb
+      - mysql2
+      - next
+      - pg
+      - prisma
+      - solid-js
+      - svelte
+      - vitest
+      - vue
 
   '@sanity/diff-match-patch@3.2.1': {}
 
