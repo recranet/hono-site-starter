@@ -6,51 +6,11 @@ import {
 	type PortableTextComponents,
 } from "@portabletext/to-html";
 import { raw } from "hono/html";
+import { renderPart } from "./components.tsx";
 import { languages, prefix, type Lang } from "./languages.ts";
 import { srcset } from "./media.ts";
+import { IMAGE_SRC, parts, type Field } from "./parts.ts";
 import { blockStyles, decorators, linkStyles } from "./text-styles.ts";
-
-// The starter's text styles (text-styles.ts) in one text: a lead paragraph,
-// a highlight and a button link.
-const about: TextBlock[] = [
-	{
-		_type: "block",
-		_key: "about0",
-		style: "lead",
-		markDefs: [],
-		children: [
-			{
-				_type: "span",
-				_key: "about0s",
-				text: "De pagina's worden op de Worker gerenderd. De klant logt in en past de teksten aan.",
-				marks: [],
-			},
-		],
-	},
-	{
-		_type: "block",
-		_key: "about1",
-		style: "normal",
-		markDefs: [],
-		children: [
-			{
-				_type: "span",
-				_key: "about1a",
-				text: "Naast vet en cursief heeft de editor de ",
-				marks: [],
-			},
-			{ _type: "span", _key: "about1b", text: "eigen tekststijlen", marks: ["highlight"] },
-			{ _type: "span", _key: "about1c", text: " van de site, zoals een knop:", marks: [] },
-		],
-	},
-	{
-		_type: "block",
-		_key: "about2",
-		style: "normal",
-		markDefs: [{ _type: "button", _key: "about2l", href: "/contact/" }],
-		children: [{ _type: "span", _key: "about2s", text: "Neem contact op", marks: ["about2l"] }],
-	},
-];
 
 // A paragraph, heading or list item, as stored. Marks name a decorator or the
 // _key of one of the block's markDefs (a link and its href).
@@ -63,27 +23,98 @@ type TextBlock = {
 	children: { _type: string; _key?: string; text?: string; marks?: string[] }[];
 };
 
-// The site's pages and the text blocks the customer can edit on each. The
-// navbar lists the pages of the current language in this order. `lang` is
-// one of `languages` (languages.ts); on a site with more than one, a page
-// in another language names the page it translates in `translates`, and the
-// language switch links the two. Keys are unique across languages (home,
-// "en-home"). `text` shows until the
-// customer saves the block; a blank line starts a new paragraph, and Portable
-// Text gives it styles (home's `about` shows text-styles.ts). The admin
-// lists them in this order. Names are part of the stored row: renaming one
-// loses its saved text.
+// A page part (parts.ts) as stored: its type and its fields.
+type PartBlock = { _type: string; _key: string; [field: string]: unknown };
+
+// Builders for the default texts below. Keys only need to be unique within
+// one text; the editor keeps them when the customer saves.
+let next = 0;
+const key = () => `d${next++}`;
+function p(text: string, style = "normal"): TextBlock {
+	return {
+		_type: "block",
+		_key: key(),
+		style,
+		markDefs: [],
+		children: [{ _type: "span", _key: key(), text, marks: [] }],
+	};
+}
+function part(type: string, fields: Record<string, unknown>): PartBlock {
+	return { _type: type, _key: key(), ...fields };
+}
+// A list field's items, each with a _key.
+function items(list: Record<string, unknown>[]) {
+	return list.map((item) => ({ _key: key(), ...item }));
+}
+
+const placeholder = {
+	src: "/img/placeholder.svg",
+	alt: "Voorbeeldafbeelding: bergen en een zon",
+	width: 1600,
+	height: 1200,
+};
+
+// The site's pages, each with the texts the customer can edit. The navbar
+// lists the pages of the current language in this order. `lang` is one of
+// `languages` (languages.ts); on a site with more than one, a page in another
+// language names the page it translates in `translates`, and the language
+// switch links the two. Keys are unique across languages (home, "en-home").
+//
+// A page is one `body` text: the page parts (parts.ts) the customer inserts
+// render full width, the paragraphs between them in a text column. `text`
+// shows until the customer saves it: a string (a blank line starts a new
+// paragraph) or Portable Text with parts. Names are part of the stored row:
+// renaming one loses its saved text.
 export const pages = {
 	home: {
 		title: "Home",
 		lang: "nl",
 		path: "/",
 		blocks: {
-			intro: {
-				label: "Introductie",
-				text: "Een site op Cloudflare Workers. De teksten zijn te bewerken via /admin/.",
+			body: {
+				label: "Pagina",
+				text: [
+					part("hero", {
+						title: "Welkom",
+						intro:
+							"Een site op Cloudflare Workers. De klant bouwt de pagina's zelf op via /admin/.",
+						buttons: items([{ label: "Neem contact op", href: "/contact/" }]),
+					}),
+					p("Over deze site", "h2"),
+					p("De pagina's worden op de Worker gerenderd. De klant logt in en past ze aan.", "lead"),
+					// The site's own text styles (text-styles.ts): a highlight and a button link.
+					{
+						_type: "block",
+						_key: key(),
+						style: "normal",
+						markDefs: [],
+						children: [
+							{
+								_type: "span",
+								_key: key(),
+								text: "Naast vet en cursief heeft de editor de ",
+								marks: [],
+							},
+							{ _type: "span", _key: key(), text: "eigen tekststijlen", marks: ["highlight"] },
+							{ _type: "span", _key: key(), text: " van de site, zoals een knop:", marks: [] },
+						],
+					},
+					{
+						_type: "block",
+						_key: "home-button",
+						style: "normal",
+						markDefs: [{ _type: "button", _key: "home-button-link", href: "/onderdelen/" }],
+						children: [
+							{
+								_type: "span",
+								_key: key(),
+								text: "Bekijk de onderdelen",
+								marks: ["home-button-link"],
+							},
+						],
+					},
+				],
 			},
-			about: { label: "Over deze site", text: about },
 		},
 	},
 	"over-ons": {
@@ -91,25 +122,143 @@ export const pages = {
 		lang: "nl",
 		path: "/over-ons/",
 		blocks: {
-			intro: { label: "Introductie", text: "Dit is een voorbeeldpagina met tekst." },
-			body: { label: "Tekst", text: "Vertel hier wie je bent en wat je doet." },
+			body: {
+				label: "Pagina",
+				text: [
+					part("hero", { title: "Over ons", intro: "Dit is een voorbeeldpagina met tekst." }),
+					p("Vertel hier wie je bent en wat je doet."),
+				],
+			},
 		},
 	},
-	// The page parts in components.tsx, each once. A site deletes this page.
+	// Every part once, with placeholder content. A site deletes this page.
 	onderdelen: {
 		title: "Onderdelen",
 		lang: "nl",
 		path: "/onderdelen/",
 		blocks: {
-			intro: {
-				label: "Introductie",
-				text: "De onderdelen uit src/components.tsx. Gebruik op een pagina wat past en verwijder deze pagina.",
+			body: {
+				label: "Pagina",
+				text: [
+					part("hero", {
+						title: "Onderdelen",
+						intro:
+							"Deze pagina is één tekst. Elk vlak is een onderdeel dat de klant in de editor invoegt en invult.",
+						image: placeholder,
+						variant: "cover",
+						buttons: items([{ label: "Neem contact op", href: "/contact/" }]),
+					}),
+					part("feature", {
+						headline: "Tekst naast afbeelding",
+						title: "Afbeelding links of rechts",
+						text: "Met een tekst, knoppen en een onderschrift bij de afbeelding.\n\nEen lege regel begint een nieuwe alinea.",
+						image: placeholder,
+						caption: "Een onderschrift",
+						align: "left",
+						buttons: items([{ label: "Lees meer", href: "/over-ons/", style: "outline" }]),
+					}),
+					part("cards", {
+						title: "Kaarten",
+						intro: "Drie stijlen: met afbeelding, tekst over de afbeelding en alleen tekst.",
+						layout: "grid",
+						cards: items([
+							{
+								title: "Kaart",
+								text: "Afbeelding boven de tekst",
+								href: "/over-ons/",
+								image: placeholder,
+							},
+							{
+								title: "Overlay",
+								text: "Tekst over de afbeelding",
+								href: "/over-ons/",
+								image: placeholder,
+								style: "overlay",
+							},
+							{
+								title: "Tekst",
+								text: "Alleen tekst, in de merkkleur",
+								href: "/over-ons/",
+								style: "text",
+							},
+						]),
+					}),
+					part("cards", {
+						title: "Bento",
+						layout: "bento",
+						cards: items([
+							{ title: "Breed", image: placeholder, style: "overlay" },
+							{ title: "Smal", image: placeholder, style: "overlay" },
+							{ title: "Smal", style: "text" },
+							{ title: "Breed", image: placeholder, style: "overlay" },
+						]),
+					}),
+					part("features", {
+						title: "Kenmerken",
+						layout: "grid",
+						items: items([
+							{ title: "Snel", text: "Pagina's komen van de Worker, dicht bij de bezoeker." },
+							{ title: "Bewerkbaar", text: "De klant bouwt de pagina op via /admin/." },
+							{ title: "Licht", text: "Geen JavaScript-bibliotheken nodig.", image: placeholder },
+						]),
+					}),
+					part("stats", {
+						title: "Kerncijfers",
+						items: items([
+							{ value: "25+", label: "jaar ervaring" },
+							{ value: "1.200", label: "klanten" },
+							{ value: "98%", label: "tevreden" },
+							{ value: "24/7", label: "bereikbaar" },
+						]),
+					}),
+					p("In de tekstkolom", "h2"),
+					p(
+						"Tussen de vlakken staat gewone tekst. Uitklapvragen, een citaat, een vinkjeslijst en labels staan in die kolom.",
+					),
+					part("accordion", {
+						items: items([
+							{ title: "Opent één vraag tegelijk?", text: "Ja, zonder script." },
+							{
+								title: "Kan een antwoord lang zijn?",
+								text: "Ja.\n\nEen lege regel begint een nieuwe alinea.",
+							},
+						]),
+					}),
+					part("checklist", {
+						items: items([
+							{ label: "Vinkjeslijst", text: "Met een regel uitleg" },
+							{ label: "Alleen een punt" },
+						]),
+					}),
+					part("quote", { text: "Een citaat met de bron eronder.", source: "Een klant" }),
+					part("labels", {
+						items: items([{ text: "Label" }, { text: "Nog een label" }, { text: "Derde" }]),
+					}),
+					part("cta", {
+						title: "Oproep",
+						text: "Een vlak in de merkkleur met knoppen.",
+						buttons: items([
+							{ label: "Neem contact op", href: "/contact/" },
+							{ label: "Over ons", href: "/over-ons/", style: "outline" },
+						]),
+					}),
+					part("marquee", {
+						speed: "normal",
+						items: items([
+							{ text: "Lopende tekst" },
+							{ text: "Pauzeert bij hover" },
+							{ text: "Staat stil bij reduced motion" },
+						]),
+					}),
+					part("map", { title: "Kaart", query: "Middelburg" }),
+					part("hero", {
+						title: "Hero naast afbeelding",
+						intro: "De andere weergave: tekst naast de afbeelding.",
+						image: placeholder,
+						variant: "split",
+					}),
+				],
 			},
-			feature: {
-				label: "Tekst naast afbeelding",
-				text: "Een tekst naast een afbeelding, links of rechts. De klant past de tekst aan; de afbeelding staat in de code.\n\nDe kolom heeft de class article: alinea's, lijsten en citaten krijgen ruimte.",
-			},
-			cta: { label: "Oproep", text: "Een vlak in de merkkleur met knoppen." },
 		},
 	},
 	contact: {
@@ -117,7 +266,11 @@ export const pages = {
 		lang: "nl",
 		path: "/contact/",
 		blocks: {
-			intro: { label: "Introductie", text: "Neem contact met ons op." },
+			// The form shows below this text (index.tsx).
+			body: {
+				label: "Pagina",
+				text: [part("hero", { title: "Contact", intro: "Neem contact met ons op." })],
+			},
 		},
 	},
 } satisfies Record<string, Page>;
@@ -128,7 +281,7 @@ type Page = {
 	translates?: string;
 	// Without the language prefix: "/about/", not "/en/about/".
 	path: string;
-	blocks: Record<string, { label: string; text: string | TextBlock[] }>;
+	blocks: Record<string, { label: string; text: string | (TextBlock | PartBlock)[] }>;
 };
 export type PageName = keyof typeof pages;
 const all: Record<string, Page> = pages;
@@ -166,6 +319,8 @@ function db(): D1Database | undefined {
 
 // Loads a page's saved blocks in one query and returns a function that
 // renders one block as HTML: the saved Portable Text, or the default text.
+// `text.page(name)` renders it as the page's sections instead: each section
+// part on its own, the blocks between them in a text column.
 export async function blocks<P extends PageName>(page: P) {
 	const saved = new Map<string, PortableTextBlock[]>();
 	const rows = await db()
@@ -174,8 +329,30 @@ export async function blocks<P extends PageName>(page: P) {
 		.all<{ name: string; value: string }>();
 	for (const row of rows?.results ?? []) saved.set(row.name, JSON.parse(row.value));
 	const defined: Page["blocks"] = pages[page].blocks;
-	return (name: keyof (typeof pages)[P]["blocks"] & string) =>
-		raw(toHTML(clean(saved.get(name) ?? textToBlocks(defined[name].text)), { components }));
+	type Name = keyof (typeof pages)[P]["blocks"] & string;
+	const value = (name: Name) => clean(saved.get(name) ?? textToBlocks(defined[name].text));
+	const text = (name: Name) => raw(toHTML(value(name), { components }));
+	return Object.assign(text, { page: (name: Name) => raw(sections(value(name))) });
+}
+
+function sections(value: PortableTextBlock[]) {
+	const html: string[] = [];
+	let run: PortableTextBlock[] = [];
+	const flush = () => {
+		if (run.length === 0) return;
+		html.push(
+			`<section><div class="container"><div class="article max-w-3xl">${toHTML(run, { components })}</div></div></section>`,
+		);
+		run = [];
+	};
+	for (const block of value) {
+		if (parts[block._type]?.section) {
+			flush();
+			html.push(toHTML(block, { components }));
+		} else run.push(block);
+	}
+	flush();
+	return html.join("");
 }
 
 // One block's stored value, or its default as Portable Text, for the editor.
@@ -270,6 +447,13 @@ const components: PortableTextComponents = {
 						`<a href="${image.src}" class="block overflow-hidden rounded-md" data-gallery>${img(image, "(min-width: 48rem) 33vw, 50vw", ' class="aspect-square size-full object-cover transition-transform hover:scale-105"')}</a>`,
 				)
 				.join("")}</div>`,
+		// The page parts (parts.ts), rendered by components.tsx.
+		...Object.fromEntries(
+			Object.keys(parts).map((name) => [
+				name,
+				({ value }: { value: Record<string, unknown> }) => renderPart(value),
+			]),
+		),
 	},
 };
 
@@ -286,11 +470,13 @@ const DECORATORS = new Set([
 const ANNOTATIONS = new Set(["link", ...Object.keys(linkStyles)]);
 const LISTS = new Set(["bullet", "number"]);
 
-// Drops what the site no longer has, so removing a text style never breaks a
-// saved text: its blocks show as normal paragraphs, its marks as plain text.
+// Drops what the site no longer has, so removing a text style or a part never
+// breaks a saved text: its blocks show as normal paragraphs, its marks as
+// plain text, and a removed part is left out.
+const OBJECTS = new Set(["image", "gallery", ...Object.keys(parts)]);
 function clean(value: PortableTextBlock[]): PortableTextBlock[] {
-	return value.map((b) => {
-		if (b._type !== "block") return b;
+	return value.flatMap((b) => {
+		if (b._type !== "block") return OBJECTS.has(b._type) ? [b] : [];
 		const block = b as unknown as TextBlock;
 		const markDefs = (block.markDefs ?? []).filter((def) => ANNOTATIONS.has(def._type));
 		const keys = new Set(markDefs.map((def) => def._key));
@@ -307,9 +493,9 @@ function clean(value: PortableTextBlock[]): PortableTextBlock[] {
 	});
 }
 
-// The editor's JSON as posted. Only text, image and gallery blocks with known
-// styles and marks, and not too large; to-html escapes the text and drops
-// unsafe link URLs when it renders.
+// The editor's JSON as posted. Only text, image, gallery and part blocks with
+// known styles, marks and fields, and not too large; to-html and JSX escape
+// the text when it renders.
 export function parseBlocks(json: string): PortableTextBlock[] | undefined {
 	if (json.length > 200_000) return undefined;
 	try {
@@ -330,7 +516,54 @@ function isBlock(b: unknown): boolean {
 		const list = block.images;
 		return Array.isArray(list) && list.length > 0 && list.length <= 60 && list.every(isImage);
 	}
-	return false;
+	const part = typeof block._type === "string" ? parts[block._type] : undefined;
+	return part !== undefined && hasFields(block, part.fields);
+}
+
+// A part or one item of its lists: only its own fields (and _type, _key),
+// each of the right kind.
+function hasFields(value: Record<string, unknown>, fields: Field[]): boolean {
+	const names = new Set(["_type", "_key", ...fields.map((f) => f.name)]);
+	if (Object.keys(value).some((name) => !names.has(name))) return false;
+	return fields.every((f) => isField(value[f.name], f));
+}
+
+function isField(value: unknown, field: Field): boolean {
+	if (value === undefined || value === "") return !("required" in field && field.required);
+	switch (field.kind) {
+		case "text":
+			return typeof value === "string" && value.length <= 300;
+		case "textarea":
+			return typeof value === "string" && value.length <= 5000;
+		case "url":
+			return typeof value === "string" && value.length <= 2000 && uriLooksSafe(value);
+		case "select":
+			return typeof value === "string" && Object.hasOwn(field.options, value);
+		case "image":
+			return isPartImage(value);
+		case "items":
+			return (
+				Array.isArray(value) &&
+				value.length <= 50 &&
+				value.every(
+					(item) => typeof item === "object" && item !== null && hasFields(item, field.fields),
+				)
+			);
+	}
+}
+
+function isPartImage(i: unknown): boolean {
+	if (typeof i !== "object" || i === null) return false;
+	const image = i as Record<string, unknown>;
+	const size = (n: unknown) => n === undefined || (Number.isInteger(n) && (n as number) > 0);
+	return (
+		typeof image.src === "string" &&
+		IMAGE_SRC.test(image.src) &&
+		typeof image.alt === "string" &&
+		image.alt.length <= 300 &&
+		size(image.width) &&
+		size(image.height)
+	);
 }
 
 function isTextBlock(block: Record<string, unknown>): boolean {
@@ -361,8 +594,8 @@ function isImage(i: unknown): boolean {
 	);
 }
 
-function textToBlocks(text: string | TextBlock[]): PortableTextBlock[] {
-	if (typeof text !== "string") return text;
+function textToBlocks(text: string | (TextBlock | PartBlock)[]): PortableTextBlock[] {
+	if (typeof text !== "string") return text as PortableTextBlock[];
 	return text.split(/\n\s*\n/).map((paragraph, i) => ({
 		_type: "block",
 		_key: `default${i}`,

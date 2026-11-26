@@ -32,6 +32,7 @@ import {
 } from "@portabletext/editor/selectors";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { parts, type Field, type ItemField } from "../parts.ts";
 import { blockStyles, decorators, linkStyles } from "../text-styles.ts";
 import type { AdminData } from "./index.tsx";
 
@@ -71,6 +72,19 @@ const schemaDefinition = defineSchema({
 		},
 		// Several images, each { _key, src, alt, width, height }.
 		{ name: "gallery", fields: [{ name: "images", type: "array" }] },
+		// The page parts (parts.ts): lists are arrays, images objects, the rest strings.
+		...Object.entries(parts).map(([name, part]) => ({
+			name,
+			fields: part.fields.map((f) => ({
+				name: f.name,
+				type:
+					f.kind === "items"
+						? ("array" as const)
+						: f.kind === "image"
+							? ("object" as const)
+							: ("string" as const),
+			})),
+		})),
 	],
 });
 
@@ -87,6 +101,53 @@ type GalleryEdit = { path: BlockPath; images: Image[] };
 const galleryEdits = new EventTarget();
 function editGallery(path: BlockPath, images: Image[]) {
 	galleryEdits.dispatchEvent(new CustomEvent<GalleryEdit>("edit", { detail: { path, images } }));
+}
+
+// A part's stored fields (parts.ts), and the edit that opens its form: a new
+// part has no path yet.
+type PartValue = { _type?: string; _key?: string; [field: string]: unknown };
+type Row = { _key: string; [field: string]: unknown };
+type PartEdit = { type: string; path?: BlockPath; value: PartValue };
+const partEdits = new EventTarget();
+function editPart(edit: PartEdit) {
+	partEdits.dispatchEvent(new CustomEvent<PartEdit>("edit", { detail: edit }));
+}
+
+const asText = (v: unknown) => (typeof v === "string" ? v : "");
+const asRows = (v: unknown) => (Array.isArray(v) ? (v as Row[]) : []);
+const asImage = (v: unknown) =>
+	typeof v === "object" && v !== null && typeof (v as Image).src === "string"
+		? (v as Image)
+		: undefined;
+const newKey = () => `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+
+// The card's line: the first text field that has a value, else the first item's.
+function summary(value: PartValue, fields: Field[]): string {
+	for (const f of fields) {
+		if ((f.kind === "text" || f.kind === "textarea") && asText(value[f.name]))
+			return asText(value[f.name]);
+	}
+	for (const f of fields) {
+		if (f.kind !== "items") continue;
+		const list = asRows(value[f.name]);
+		if (list.length === 0) continue;
+		const first = summary(list[0], f.fields);
+		return list.length > 1 ? `${first} en ${list.length - 1} meer` : first;
+	}
+	return "Nog leeg";
+}
+
+function firstImage(value: PartValue, fields: Field[]): Image | undefined {
+	for (const f of fields) {
+		if (f.kind === "image" && asImage(value[f.name])) return asImage(value[f.name]);
+		if (f.kind === "items") {
+			for (const row of asRows(value[f.name])) {
+				const image = firstImage(row, f.fields);
+				if (image) return image;
+			}
+		}
+	}
+	return undefined;
 }
 
 const nodes = [
@@ -167,6 +228,36 @@ const nodes = [
 			);
 		},
 	}),
+	// A part shows as a card with its name, a summary and Bewerken.
+	...Object.entries(parts).map(([type, part]) =>
+		defineBlockObject({
+			type,
+			render: ({ attributes, children, node, path, selected }) => {
+				const value = node as PartValue;
+				const image = firstImage(value, part.fields);
+				return (
+					<div {...attributes} className={selected ? "pt-part selected" : "pt-part"}>
+						{children}
+						<div className="pt-part-body" contentEditable={false}>
+							{image ? <img src={preview(image.src)} alt="" /> : null}
+							<div>
+								<div className="pt-part-type">{part.label}</div>
+								<div className="pt-part-summary">{summary(value, part.fields)}</div>
+							</div>
+							<button
+								type="button"
+								className="button small"
+								onMouseDown={(event) => event.preventDefault()}
+								onClick={() => editPart({ type, path: path as BlockPath, value })}
+							>
+								Bewerken
+							</button>
+						</div>
+					</div>
+				);
+			},
+		}),
+	),
 	...["link", ...Object.keys(linkStyles)].map((type) =>
 		defineAnnotation({
 			type,
@@ -308,6 +399,7 @@ function FormatToolbar() {
 			))}
 			{data.media && <ImagePopover />}
 			{data.media && <GalleryPopover />}
+			<PartPopover />
 			<Toolbar.Separator className="separator" />
 			<Toolbar.Group className="tool-group" aria-label="Geschiedenis">
 				{button("↶", "Ongedaan maken", () => send({ type: "history.undo" }))}
@@ -708,6 +800,341 @@ function GalleryEditor() {
 	);
 }
 
+// The parts menu: picking one opens its empty form; Invoegen in the form
+// puts it at the cursor.
+function PartPopover() {
+	const [open, setOpen] = useState(false);
+	return (
+		<Popover.Root open={open} onOpenChange={setOpen}>
+			<Popover.Trigger render={<Toolbar.Button className="tool" />}>Onderdeel</Popover.Trigger>
+			<Popover.Portal>
+				<Popover.Positioner sideOffset={4} align="start">
+					<Popover.Popup className="popup part-menu">
+						<Popover.Title className="popup-title">Onderdeel invoegen</Popover.Title>
+						{Object.entries(parts).map(([type, part]) => (
+							<button
+								key={type}
+								type="button"
+								className="part-menu-item"
+								onClick={() => {
+									setOpen(false);
+									editPart({ type, value: {} });
+								}}
+							>
+								{part.label}
+							</button>
+						))}
+					</Popover.Popup>
+				</Popover.Positioner>
+			</Popover.Portal>
+		</Popover.Root>
+	);
+}
+
+// What's missing before a part or item can be applied, or "" when it's complete.
+function missing(value: PartValue, fields: Field[]): string {
+	for (const f of fields) {
+		const v = value[f.name];
+		if (f.kind === "items") {
+			for (const row of asRows(v)) {
+				const problem = missing(row, f.fields);
+				if (problem) return `${f.item}: ${problem}`;
+			}
+		} else if (f.kind === "image") {
+			const image = asImage(v);
+			if (!image && f.required) return `Kies een afbeelding bij ${f.label}.`;
+			if (image && image.alt.trim() === "")
+				return `Beschrijf de afbeelding bij ${f.label} voor wie hem niet ziet.`;
+		} else if ("required" in f && f.required && asText(v).trim() === "") {
+			return `Vul ${f.label} in.`;
+		}
+	}
+	return "";
+}
+
+// The form for one part, built from its fields (parts.ts). Toepassen writes
+// the fields into the block (or inserts a new one); Save stores it as usual.
+function PartEditor() {
+	const editor = useEditor();
+	const [edit, setEdit] = useState<PartEdit | null>(null);
+	const [value, setValue] = useState<PartValue>({});
+	const [problem, setProblem] = useState("");
+
+	useEffect(() => {
+		const open = (event: Event) => {
+			const detail = (event as CustomEvent<PartEdit>).detail;
+			const { _type, _key, ...fields } = detail.value;
+			setEdit(detail);
+			setValue(structuredClone(fields));
+			setProblem("");
+		};
+		partEdits.addEventListener("edit", open);
+		return () => partEdits.removeEventListener("edit", open);
+	}, []);
+
+	const part = edit ? parts[edit.type] : undefined;
+
+	const apply = () => {
+		if (!edit || !part) return;
+		const problem = missing(value, part.fields);
+		if (problem) return setProblem(problem);
+		if (edit.path) {
+			// Emptied fields leave the block, set ones are written.
+			const empty = part.fields
+				.map((f) => f.name)
+				.filter((name) => value[name] === undefined || value[name] === "");
+			const set = Object.fromEntries(
+				Object.entries(value).filter(([name]) => !empty.includes(name)),
+			);
+			editor.send({ type: "block.set", at: edit.path, props: set });
+			if (empty.length) editor.send({ type: "block.unset", at: edit.path, props: empty });
+		} else {
+			editor.send({
+				type: "insert.block object",
+				blockObject: { name: edit.type, value },
+				placement: "auto",
+			});
+		}
+		editor.send({ type: "focus" });
+		setEdit(null);
+	};
+
+	return (
+		<Dialog.Root open={edit !== null} onOpenChange={(open) => !open && setEdit(null)}>
+			<Dialog.Portal>
+				<Dialog.Backdrop className="backdrop" />
+				<Dialog.Popup className="popup dialog">
+					<Dialog.Title className="popup-title">{part?.label}</Dialog.Title>
+					{part && (
+						<Fields
+							fields={part.fields}
+							value={value}
+							onChange={(next) => setValue((current) => ({ ...current, ...next }))}
+						/>
+					)}
+					{problem && (
+						<p className="problem" role="alert">
+							{problem}
+						</p>
+					)}
+					<div className="row">
+						<button type="button" className="button primary" onClick={apply}>
+							{edit?.path ? "Toepassen" : "Invoegen"}
+						</button>
+						<Dialog.Close className="button">Annuleren</Dialog.Close>
+					</div>
+				</Dialog.Popup>
+			</Dialog.Portal>
+		</Dialog.Root>
+	);
+}
+
+function Fields(props: { fields: Field[]; value: PartValue; onChange: (next: PartValue) => void }) {
+	return (
+		<div className="fields">
+			{props.fields.map((f) =>
+				f.kind === "items" ? (
+					<Items
+						key={f.name}
+						field={f}
+						rows={asRows(props.value[f.name])}
+						onChange={(rows) => props.onChange({ [f.name]: rows })}
+					/>
+				) : (
+					<FieldInput
+						key={f.name}
+						field={f}
+						value={props.value[f.name]}
+						onChange={(v) => props.onChange({ [f.name]: v })}
+					/>
+				),
+			)}
+		</div>
+	);
+}
+
+// A list field: each item's fields, with move, remove and add.
+function Items(props: {
+	field: Extract<Field, { kind: "items" }>;
+	rows: Row[];
+	onChange: (rows: Row[]) => void;
+}) {
+	const { field, rows } = props;
+	const set = (i: number, next: PartValue) =>
+		props.onChange(rows.map((row, j) => (j === i ? { ...row, ...next } : row)));
+	const move = (i: number, by: number) => {
+		const list = [...rows];
+		const [row] = list.splice(i, 1);
+		list.splice(i + by, 0, row);
+		props.onChange(list);
+	};
+	return (
+		<fieldset className="items">
+			<legend>{field.label}</legend>
+			{rows.map((row, i) => (
+				<div className="item" key={row._key}>
+					<div className="item-bar">
+						<span>
+							{field.item} {i + 1}
+						</span>
+						<button
+							type="button"
+							className="button small"
+							aria-label="Omhoog"
+							disabled={i === 0}
+							onClick={() => move(i, -1)}
+						>
+							↑
+						</button>
+						<button
+							type="button"
+							className="button small"
+							aria-label="Omlaag"
+							disabled={i === rows.length - 1}
+							onClick={() => move(i, 1)}
+						>
+							↓
+						</button>
+						<button
+							type="button"
+							className="button small"
+							aria-label="Verwijderen"
+							onClick={() => props.onChange(rows.filter((_, j) => j !== i))}
+						>
+							×
+						</button>
+					</div>
+					{field.fields.map((f) => (
+						<FieldInput
+							key={f.name}
+							field={f}
+							value={row[f.name]}
+							onChange={(v) => set(i, { [f.name]: v })}
+						/>
+					))}
+				</div>
+			))}
+			<div>
+				<button
+					type="button"
+					className="button small"
+					onClick={() => props.onChange([...rows, { _key: newKey() }])}
+				>
+					{field.item} toevoegen
+				</button>
+			</div>
+		</fieldset>
+	);
+}
+
+function FieldInput(props: { field: ItemField; value: unknown; onChange: (v: unknown) => void }) {
+	const { field } = props;
+	const label = "required" in field && field.required ? `${field.label} *` : field.label;
+	if (field.kind === "image")
+		return <ImageInput label={label} value={asImage(props.value)} onChange={props.onChange} />;
+	return (
+		<label className="field">
+			<span>{label}</span>
+			{field.kind === "textarea" ? (
+				<textarea
+					className="input textarea"
+					rows={4}
+					value={asText(props.value)}
+					onChange={(event) => props.onChange(event.target.value)}
+				/>
+			) : field.kind === "select" ? (
+				<select
+					className="input"
+					value={asText(props.value) || Object.keys(field.options)[0]}
+					onChange={(event) => props.onChange(event.target.value)}
+				>
+					{Object.entries(field.options).map(([value, text]) => (
+						<option key={value} value={value}>
+							{text}
+						</option>
+					))}
+				</select>
+			) : (
+				<Input
+					className="input"
+					type={field.kind === "url" ? "text" : undefined}
+					placeholder={field.kind === "url" ? "/pagina/ of https://…" : undefined}
+					value={asText(props.value)}
+					onValueChange={props.onChange}
+				/>
+			)}
+		</label>
+	);
+}
+
+// An image field: its preview and alt text, a new upload, or none.
+function ImageInput(props: {
+	label: string;
+	value: Image | undefined;
+	onChange: (v: Image | undefined) => void;
+}) {
+	const [busy, setBusy] = useState(false);
+	const [problem, setProblem] = useState("");
+	const choose = async (file: File) => {
+		setBusy(true);
+		setProblem("");
+		try {
+			props.onChange(await upload(file, props.value?.alt ?? ""));
+		} catch (e) {
+			setProblem((e as Error).message || "Uploaden is niet gelukt.");
+		} finally {
+			setBusy(false);
+		}
+	};
+	return (
+		<fieldset className="image-field">
+			<legend>{props.label}</legend>
+			{props.value && (
+				<div className="image-row">
+					<img src={preview(props.value.src)} alt="" />
+					<Input
+						className="input"
+						placeholder="Wat staat erop?"
+						aria-label="Alt-tekst"
+						value={props.value.alt}
+						onValueChange={(alt) => props.onChange({ ...props.value!, alt })}
+					/>
+					<button
+						type="button"
+						className="button small"
+						aria-label="Afbeelding weghalen"
+						onClick={() => props.onChange(undefined)}
+					>
+						×
+					</button>
+				</div>
+			)}
+			{data.media ? (
+				<input
+					className="file"
+					type="file"
+					accept={ACCEPT}
+					disabled={busy}
+					aria-label={props.value ? "Andere afbeelding" : "Afbeelding kiezen"}
+					onChange={(event) => {
+						const file = event.target.files?.[0];
+						event.target.value = "";
+						if (file) void choose(file);
+					}}
+				/>
+			) : (
+				!props.value && <span className="hint">Afbeeldingen staan uit op deze site.</span>
+			)}
+			{busy && <span className="hint">Bezig met uploaden…</span>}
+			{problem && (
+				<p className="problem" role="alert">
+					{problem}
+				</p>
+			)}
+		</fieldset>
+	);
+}
+
 // The editor reports changes with a delay, so read its value at submit.
 function EditForm() {
 	const editor = useEditor();
@@ -749,6 +1176,7 @@ function Screen() {
 				<EditForm />
 			</main>
 			<GalleryEditor />
+			<PartEditor />
 		</EditorProvider>
 	);
 }
