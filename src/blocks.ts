@@ -31,9 +31,11 @@ const placeholder = {
 
 // Page fields: values beside a page's texts, in a form ("Gegevens" in the
 // admin). `as const` keeps the names, so `text.fields.heading` is typed.
+// Every image needs an alt text, in defaults too (the site won't start
+// without), except a `decorative` one like the banner, which stores alt "".
 const headed = [
 	{ name: "heading", label: "Kop", kind: "text", required: true },
-	{ name: "banner", label: "Banner", kind: "image" },
+	{ name: "banner", label: "Banner", kind: "image", decorative: true },
 ] as const satisfies readonly Field[];
 
 // The site's pages, each with the texts the customer can edit. The navbar
@@ -121,7 +123,7 @@ export const pages = {
 		lang: "nl",
 		path: "/nieuws/",
 		fields: headed,
-		defaults: { heading: "Nieuws", banner: placeholder },
+		defaults: { heading: "Nieuws", banner: { ...placeholder, alt: "" } },
 		texts: {
 			body: { label: "Tekst boven de berichten", default: "Het laatste nieuws." },
 		},

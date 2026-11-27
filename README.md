@@ -106,6 +106,8 @@ const text = await editor.texts("nieuws");
 text.fields.heading; // typed from the page's fields
 ```
 
+Every image field needs an alt text: saves of page fields, items and blocks are refused without one, and a page whose `defaults` hold an image without alt stops the site at startup. An image that only decorates, like the Nieuws banner, takes `decorative: true` (`{ name: "banner", label: "Banner", kind: "image", decorative: true }`): the editor asks no alt and stores `alt: ""`. Give content images, such as a collection's photo, a real alt.
+
 A collection is a list of items of one kind (news, projects) that the customer adds, orders, hides and edits in the admin under "Collecties". The starter's example is Nieuws in `src/collections.ts` (`defineCollection`: a date, a photo and a text), registered in `src/editor.ts` (`collections`). `src/index.tsx` renders the overview with `editor.items("nieuws")` at `/nieuws/` and an item with `editor.item("nieuws", slug)` at `/nieuws/<slug>/`, a 404 when it is missing or hidden. Field kinds and the admin are in the package's README ("Page fields", "Collections").
 
 Items live in D1 only: nothing in git, and without `DB` the overview is empty. A site that moves existing pages into a collection seeds them once with the package's `collectionSeedBatch` (its README, "Seeding existing items"): a script that imports `src/collections.ts` (which imports nothing from `cloudflare:workers`, so Node runs it) writes `seed.json`, and `cf d1 raw` runs it. Items already there are skipped, so the customer's changes stay.
