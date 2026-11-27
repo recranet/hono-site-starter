@@ -1,5 +1,5 @@
 import { cloudflare } from "@cloudflare/vite-plugin";
-import { defineConfig } from "vite-plus";
+import { defineConfig } from "vite";
 
 export default defineConfig({
 	plugins: [cloudflare()],
@@ -24,9 +24,5 @@ export default defineConfig({
 				},
 			},
 		},
-	},
-	fmt: { useTabs: true },
-	lint: {
-		options: { typeAware: true, typeCheck: true },
 	},
 });

@@ -28,7 +28,7 @@ cp example-nl/.dev.vars.example example-nl/.dev.vars
 
 Note the starter commit (`git ls-remote https://github.com/recranet/hono-site-starter.git master`) in the site's first commit message. Fill in the placeholders in `package.json` and `cloudflare.config.ts`, the pages in `src/index.tsx`, the editable texts and navbar in `src/blocks.ts` (and its languages in `src/languages.ts`), the brand colours and fonts in `src/styles/app.css` and the logo in `public/img/logo.svg`. Put the reCAPTCHA score key's secret in `.dev.vars` as `RECAPTCHA_SECRET`.
 
-`pnpm check` must pass without warnings. `pnpm dev` serves the site locally.
+`pnpm check` (types) must pass without warnings. `pnpm dev` serves the site locally. To format, run `pnpm --package=vite-plus@1.4.0 dlx vp fmt`: nothing is installed in the site, and `.editorconfig` keeps the tabs.
 
 ## More languages (optional)
 
