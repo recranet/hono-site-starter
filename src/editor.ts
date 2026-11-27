@@ -43,9 +43,10 @@ const editable = Object.fromEntries(
 ) as { [P in PageName]: PageDefinition & (typeof pages)[P] };
 
 // Texts and page fields in D1, collections (collections.ts), sign-in through
-// the console, images in R2 (@recranet/worker-site-editor). The blocks are the package's extensions: the
-// editor's "Onderdeel" menu. A site drops the ones it doesn't use, or adds its
-// own with defineBlock (and defineBlockEditor in src/admin.ts).
+// the console, images in R2 (@recranet/worker-site-editor). The blocks are the
+// package's extensions: the editor's "Onderdeel" menu. A site drops the ones it
+// doesn't use, or adds its own with defineBlock (and defineBlockEditor in
+// src/admin.ts).
 export const editor = createEditor({
 	db: site.DB,
 	auth: site.AUTH_ISSUER
