@@ -4,6 +4,8 @@ Each change names the files it touches, so a site can diff just those (README, "
 
 ## 2026-11-27
 
+- `@recranet/worker-site-editor` 20261127.0.8: the admin's image thumbnails and their buttons are accessible. No migrations, no API or data changes. `package.json`, `pnpm-workspace.yaml`.
+
 - `@recranet/worker-site-editor` 20261127.0.7: the server checks that every image field has an alt text. Saves of page fields, collection items and block fields (a Hero, Kaarten or Feature image inside a text) are refused when an alt is empty, and a page whose `defaults` hold an image with an empty alt stops the site at startup. Rendering doesn't check. An image that only decorates takes `decorative: true`: no alt input, stored `alt: ""`. The Nieuws banner page field is decorative now and its default has `alt: ""`; the block defaults' placeholder already had an alt. A site taking this over checks its own `defaults` and its stored data in D1 for empty alts (`item.fields`, `page_fields.value`, images in `block.value`; gallery images aren't checked) and fills them, or the customer's next save of that text is refused. No new migrations. `src/blocks.ts`, `package.json`, `pnpm-workspace.yaml`, `README.md`.
 
 - `@recranet/worker-site-editor` 20261127.0.6: "Opslaan" in a sticky toolbar on every admin screen, and English admin paths (`/admin/texts/`, `/admin/fields/`, `/admin/collections/`, `/admin/sign-in`, `/admin/sign-out`) with 301s from the old Dutch ones. No new migrations; the OIDC redirect URI stays the same. `package.json`, `pnpm-workspace.yaml`.
