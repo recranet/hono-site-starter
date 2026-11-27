@@ -15,6 +15,7 @@ import {
 	stats,
 } from "@recranet/worker-site-editor/extensions";
 import { href, langOf, pages, type PageName } from "./blocks.ts";
+import { nieuws } from "./collections.ts";
 import { languages } from "./languages.ts";
 import { textStyles } from "./text-styles.ts";
 
@@ -37,12 +38,12 @@ const editable = Object.fromEntries(
 		const lang = langOf(page);
 		const title =
 			lang === languages[0] ? pages[page].title : `${pages[page].title} (${lang.toUpperCase()})`;
-		return [page, { title, path: href(page), texts: pages[page].texts }];
+		return [page, { ...pages[page], title, path: href(page) }];
 	}),
-) as { [P in PageName]: PageDefinition & { texts: (typeof pages)[P]["texts"] } };
+) as { [P in PageName]: PageDefinition & (typeof pages)[P] };
 
-// Texts in D1, sign-in through the console, images in R2
-// (@recranet/worker-site-editor). The blocks are the package's extensions: the
+// Texts and page fields in D1, collections (collections.ts), sign-in through
+// the console, images in R2 (@recranet/worker-site-editor). The blocks are the package's extensions: the
 // editor's "Onderdeel" menu. A site drops the ones it doesn't use, or adds its
 // own with defineBlock (and defineBlockEditor in src/admin.ts).
 export const editor = createEditor({
@@ -74,6 +75,7 @@ export const editor = createEditor({
 	],
 	textStyles,
 	pages: editable,
+	collections: { nieuws },
 	// Under `cf dev` Vite serves the admin entry's source.
 	admin: import.meta.env.DEV ? { script: "/src/admin.ts" } : undefined,
 });

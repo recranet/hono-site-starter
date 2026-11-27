@@ -1,4 +1,6 @@
+import type { ImageValue } from "@recranet/worker-site-editor";
 import { Hono } from "hono";
+import { raw } from "hono/html";
 import { appendTrailingSlash } from "hono/trailing-slash";
 import { href } from "./blocks.ts";
 import { handleContact } from "./contact.ts";
@@ -32,6 +34,95 @@ app.get(href("over-ons"), async (c) => {
 		</Layout>,
 	);
 });
+
+// The news overview: the page's fields (heading, banner) and text, then the
+// Nieuws collection's shown items in the customer's order (collections.ts).
+app.get(href("nieuws"), async (c) => {
+	const [text, items] = await Promise.all([editor.texts("nieuws"), editor.items("nieuws")]);
+	const { heading, banner } = text.fields;
+	return c.html(
+		<Layout title="Nieuws" url={c.req.url}>
+			<section class="relative overflow-hidden bg-dark text-white">
+				{banner && <Cover image={banner} />}
+				<div class="relative container">
+					<h1 class="heading-1 mb-0">{heading}</h1>
+				</div>
+			</section>
+			{text.page("body")}
+			<section>
+				<div class="container grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+					{items.map((n) => (
+						<article class="group relative flex flex-col overflow-hidden rounded-lg border border-border">
+							{raw(
+								editor.image(n.fields.image, {
+									sizes: "(min-width: 64rem) 33vw, 100vw",
+									class: "aspect-[3/2] w-full object-cover",
+								}),
+							)}
+							<div class="p-6">
+								<time class="text-sm text-muted" datetime={n.fields.date}>
+									{longDate(n.fields.date)}
+								</time>
+								<h2 class="heading-4 mt-1 mb-0">
+									<a class="stretched-link no-underline" href={n.path}>
+										{n.title}
+									</a>
+								</h2>
+							</div>
+						</article>
+					))}
+				</div>
+			</section>
+		</Layout>,
+	);
+});
+
+// One news item, at the collection's `path`; a slug that isn't there (or a
+// hidden item) is a 404.
+app.get(`${href("nieuws")}:slug/`, async (c) => {
+	const n = await editor.item("nieuws", c.req.param("slug") ?? "");
+	if (!n) return c.notFound();
+	return c.html(
+		<Layout title={n.title} url={c.req.url}>
+			<section>
+				<div class="container">
+					<div class="article mx-auto">
+						<a href={href("nieuws")}>← Nieuws</a>
+						<h1 class="mt-4 mb-2">{n.title}</h1>
+						<time class="text-muted" datetime={n.fields.date}>
+							{longDate(n.fields.date)}
+						</time>
+						{raw(
+							editor.image(n.fields.image, {
+								sizes: "(min-width: 48rem) 48rem, 100vw",
+								class: "my-6 w-full rounded-lg",
+								eager: true,
+							}),
+						)}
+					</div>
+				</div>
+			</section>
+			{n.text.page("body")}
+		</Layout>,
+	);
+});
+
+// "2026-11-27" as "27 november 2026"; anything else as it was typed.
+function longDate(date: string) {
+	const d = new Date(`${date}T12:00:00Z`);
+	return Number.isNaN(d.getTime()) ? date : d.toLocaleDateString("nl-NL", { dateStyle: "long" });
+}
+
+// A banner image behind a section's heading.
+function Cover(props: { image: ImageValue }) {
+	return raw(
+		editor.image(props.image, {
+			sizes: "100vw",
+			class: "absolute inset-0 size-full object-cover opacity-50",
+			eager: true,
+		}),
+	);
+}
 
 // Every block once (blocks.ts). A site deletes this route and the page.
 app.get(href("onderdelen"), async (c) => {

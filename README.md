@@ -63,7 +63,11 @@ cf d1 create --name example-nl
 pnpm exec cf d1 migrations apply <database-id> --dir node_modules/@recranet/worker-site-editor/migrations --table editor_migrations
 ```
 
-A site that already has the `block` table from an older starter keeps its texts: the package's first migration is `CREATE TABLE IF NOT EXISTS` with the same columns.
+```bash
+pnpm exec cf d1 migrations apply <database-id> --dir node_modules/@recranet/worker-site-editor/migrations --table editor_migrations --local
+```
+
+The migrations are `0001_block.sql` (the texts) and `0002_item_page_fields.sql` (collection items and page fields). A site that already has the `block` table from an older starter keeps its texts: the package's first migration is `CREATE TABLE IF NOT EXISTS` with the same columns.
 
 Register the site at the OpenID provider with redirect URI `https://<host>/api/auth/callback/console`. Uncomment the editing bindings in `cloudflare.config.ts`, put the client secret in `.dev.vars` as `OIDC_CLIENT_SECRET`, and generate `BETTER_AUTH_SECRET`:
 
@@ -92,6 +96,29 @@ The customer builds each page in the editor. A page is one `body` text (`src/blo
 - A route renders a page with `text.page("body")`: each full-width part as its own section, everything between them in a text column.
 
 The Onderdelen page (`/onderdelen/`) shows each part once. A site deletes it (its route in `src/index.tsx`, its entry in `src/blocks.ts`) and `public/img/placeholder.svg`. To drop a part, remove it from `blocks` in `src/editor.ts`; saved texts that use it leave it out, and keep it for when it comes back.
+
+## Collections and page fields
+
+A page can have fields beside its texts: a form the customer fills in under "Gegevens" in the admin. The Nieuws page (`src/blocks.ts`) has a heading and a banner, with `defaults` that show until the customer saves the form. A route reads them with the texts:
+
+```ts
+const text = await editor.texts("nieuws");
+text.fields.heading; // typed from the page's fields
+```
+
+A collection is a list of items of one kind (news, projects) that the customer adds, orders, hides and edits in the admin under "Collecties". The starter's example is Nieuws in `src/collections.ts` (`defineCollection`: a date, a photo and a text), registered in `src/editor.ts` (`collections`). `src/index.tsx` renders the overview with `editor.items("nieuws")` at `/nieuws/` and an item with `editor.item("nieuws", slug)` at `/nieuws/<slug>/`, a 404 when it is missing or hidden. Field kinds and the admin are in the package's README ("Page fields", "Collections").
+
+Items live in D1 only: nothing in git, and without `DB` the overview is empty. A site that moves existing pages into a collection seeds them once with the package's `collectionSeedBatch` (its README, "Seeding existing items"): a script that imports `src/collections.ts` (which imports nothing from `cloudflare:workers`, so Node runs it) writes `seed.json`, and `cf d1 raw` runs it. Items already there are skipped, so the customer's changes stay.
+
+```bash
+node scripts/seed.ts > seed.json
+```
+
+```bash
+pnpm exec cf d1 raw <database-id> --batch @seed.json
+```
+
+Add `--local` for `pnpm dev`. Delete the script and `seed.json` afterwards. To drop the example, remove `src/collections.ts`, `collections` in `src/editor.ts`, the two routes and the Nieuws page.
 
 ## Deploy
 
