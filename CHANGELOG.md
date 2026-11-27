@@ -4,6 +4,8 @@ Each change names the files it touches, so a site can diff just those (README, "
 
 ## 2026-11-27
 
+- Plain Vite and TypeScript instead of Vite+: `pnpm check` is `cf workers types && tsc --noEmit`, the `format` script, `vite-plus` and the `vite` alias to its core are gone, and `vite.config.ts` imports `defineConfig` from `vite`. Format with `pnpm --package=vite-plus@1.4.0 dlx vp fmt` when needed; `.editorconfig` (new) keeps the tabs that were `fmt: { useTabs: true }`. `package.json`, `pnpm-workspace.yaml`, `vite.config.ts`, `.editorconfig` (new), `README.md`.
+
 - Editing comes from the package `@recranet/worker-site-editor` instead of a copy in each site: sign-in, `/admin/`, texts in D1, images and galleries, and the twelve page parts as its extension blocks. `src/editor.ts` (new) registers the blocks, the text styles and the pages; `src/admin.ts` (new) is the admin bundle's entry (`mountAdmin`). Pages define `texts: { body: { label, default } }` instead of `blocks: { body: { label, text } }`; page keys, text names and stored texts stay the same. Migrations run from the package (`--dir node_modules/@recranet/worker-site-editor/migrations --table editor_migrations`); its first is `CREATE TABLE IF NOT EXISTS block`, so an existing database keeps its texts. `src/components.tsx` keeps only the Footer. `better-auth` and `@portabletext/to-html` are no longer the site's dependencies. `src/editor.ts` (new), `src/admin.ts` (new), `src/blocks.ts`, `src/text-styles.ts`, `src/index.tsx`, `src/components.tsx`, `src/styles/app.css`, `vite.config.ts`, `package.json`, `README.md`; removed `src/admin/`, `src/media.ts`, `src/parts.ts`, `migrations/`.
 
 ## 2026-11-26
