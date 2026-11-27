@@ -1,4 +1,4 @@
-import type { Block, TextBlock } from "@recranet/worker-site-editor";
+import type { Block, Field, TextBlock } from "@recranet/worker-site-editor";
 import { languages, prefix, type Lang } from "./languages.ts";
 
 // Builders for the default texts below. Keys only need to be unique within
@@ -28,6 +28,13 @@ const placeholder = {
 	width: 1600,
 	height: 1200,
 };
+
+// Page fields: values beside a page's texts, in a form ("Gegevens" in the
+// admin). `as const` keeps the names, so `text.fields.heading` is typed.
+const headed = [
+	{ name: "heading", label: "Kop", kind: "text", required: true },
+	{ name: "banner", label: "Banner", kind: "image" },
+] as const satisfies readonly Field[];
 
 // The site's pages, each with the texts the customer can edit. The navbar
 // lists the pages of the current language in this order. `lang` is one of
@@ -104,6 +111,19 @@ export const pages = {
 					p("Vertel hier wie je bent en wat je doet."),
 				],
 			},
+		},
+	},
+	// The news overview (index.tsx): its heading and banner are page fields, a
+	// form the customer fills in under "Gegevens", and the items below them
+	// come from the Nieuws collection (collections.ts).
+	nieuws: {
+		title: "Nieuws",
+		lang: "nl",
+		path: "/nieuws/",
+		fields: headed,
+		defaults: { heading: "Nieuws", banner: placeholder },
+		texts: {
+			body: { label: "Tekst boven de berichten", default: "Het laatste nieuws." },
 		},
 	},
 	// Every part once, with placeholder content. A site deletes this page.
@@ -257,6 +277,9 @@ type Page = {
 	// Without the language prefix: "/about/", not "/en/about/".
 	path: string;
 	texts: Record<string, { label: string; default: string | Block[] }>;
+	// The form's fields and its values until the customer saves it.
+	fields?: readonly Field[];
+	defaults?: Record<string, unknown>;
 };
 export type PageName = keyof typeof pages;
 const all: Record<string, Page> = pages;

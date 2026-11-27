@@ -9,4 +9,4 @@ allowBuilds:
   "@parcel/watcher": false
 
 minimumReleaseAgeExclude:
-  - "@recranet/worker-site-editor@20261127.0.2"
+  - "@recranet/worker-site-editor@20261127.0.4"
