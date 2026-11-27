@@ -49,15 +49,13 @@ const editable = Object.fromEntries(
 // src/admin.ts).
 export const editor = createEditor({
 	db: site.DB,
-	auth: site.AUTH_ISSUER
-		? {
-				issuer: site.AUTH_ISSUER,
-				customerId: site.CUSTOMER_ID ?? "",
-				clientId: site.OIDC_CLIENT_ID ?? "",
-				clientSecret: site.OIDC_CLIENT_SECRET ?? "",
-				secret: site.BETTER_AUTH_SECRET ?? "",
-			}
-		: undefined,
+	auth: {
+		issuer: site.AUTH_ISSUER,
+		customerId: site.CUSTOMER_ID,
+		clientId: site.OIDC_CLIENT_ID,
+		clientSecret: site.OIDC_CLIENT_SECRET,
+		secret: site.BETTER_AUTH_SECRET,
+	},
 	media: site.MEDIA,
 	images: site.IMAGES,
 	blocks: [
@@ -77,6 +75,9 @@ export const editor = createEditor({
 	textStyles,
 	pages: editable,
 	collections: { nieuws },
+	// The text column between full-width blocks in text.page().
+	column: (html) =>
+		`<section><div class="container"><div class="article max-w-3xl">${html}</div></div></section>`,
 	// Under `cf dev` Vite serves the admin entry's source.
 	admin: import.meta.env.DEV ? { script: "/src/admin.ts" } : undefined,
 });

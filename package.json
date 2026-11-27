@@ -12,7 +12,7 @@
 	"dependencies": {
 		"@base-ui/react": "^1.9.0",
 		"@portabletext/editor": "^8.2.15",
-		"@recranet/worker-site-editor": "20261127.0.8",
+		"@recranet/worker-site-editor": "20261127.0.9",
 		"hono": "^4.13.21",
 		"react": "^19.3.1",
 		"react-dom": "^19.3.1"
